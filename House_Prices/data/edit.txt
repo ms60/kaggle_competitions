@@ -1,0 +1,58 @@
+               missing_rate  n_unique                                           n_values
+Street             0.000000         2                                       [Pave, Grvl] # nominal +
+Alley              0.937671         2                                  [nan, Grvl, Pave] # remove
+Utilities          0.000000         2                                   [AllPub, NoSeWa] # ordinal +
+CentralAir         0.000000         2                                             [Y, N] # ordinal +
+MasVnrType         0.597260         3                      [BrkFace, nan, Stone, BrkCmn] # nominal+
+LandSlope          0.000000         3                                    [Gtl, Mod, Sev] # ordinal +
+HalfBath           0.000000         3                                          [1, 0, 2] # no action +
+BsmtHalfBath       0.000000         3                                          [0, 1, 2] # no action +
+PavedDrive         0.000000         3                                          [Y, N, P] # ordinal +
+GarageFinish       0.055479         3                               [RFn, Unf, Fin, nan] # ordinal + 
+PoolQC             0.995205         3                                  [nan, Ex, Fa, Gd] # remove
+BsmtExposure       0.026027         4                              [No, Gd, Mn, Av, nan] # ordinal +
+ExterQual          0.000000         4                                   [Gd, TA, Ex, Fa] # ordinal +
+BsmtQual           0.025342         4                              [Gd, TA, Ex, nan, Fa] # ordinal+
+LandContour        0.000000         4                               [Lvl, Bnk, Low, HLS] # ordinal +
+LotShape           0.000000         4                               [Reg, IR1, IR2, IR3] # ordinal +
+BsmtFullBath       0.000000         4                                       [1, 0, 2, 3] # no action +
+KitchenAbvGr       0.000000         4                                       [1, 2, 3, 0] # no action +
+KitchenQual        0.000000         4                                   [Gd, TA, Ex, Fa] # ordinal +
+BsmtCond           0.025342         4                              [TA, Gd, nan, Fa, Po] # ordinal +
+FullBath           0.000000         4                                       [2, 1, 3, 0] # no action +
+Fireplaces         0.000000         4                                       [0, 1, 2, 3] # no action +
+Fence              0.807534         4                    [nan, MnPrv, GdWo, GdPrv, MnWw] # remove
+MiscFeature        0.963014         4                      [nan, Shed, Gar2, Othr, TenC] # remove
+Electrical         0.000685         5             [SBrkr, FuseF, FuseA, FuseP, Mix, nan] # ordinal +
+ExterCond          0.000000         5                               [TA, Gd, Fa, Po, Ex] # ordinal +
+GarageCond         0.055479         5                          [TA, Fa, nan, Gd, Po, Ex] # ordinal +
+GarageQual         0.055479         5                          [TA, Fa, Gd, nan, Ex, Po] # ordinal+
+BldgType           0.000000         5              [1Fam, 2fmCon, Duplex, TwnhsE, Twnhs] # nominal+
+HeatingQC          0.000000         5                               [Ex, Gd, TA, Fa, Po] # ordinal +
+MSZoning           0.000000         5                          [RL, RM, C (all), FV, RH] # nominal +
+LotConfig          0.000000         5                [Inside, FR2, Corner, CulDSac, FR3] # nominal +
+YrSold             0.000000         5                     [2008, 2007, 2006, 2009, 2010] # nominal +
+FireplaceQu        0.472603         5                          [nan, TA, Gd, Fa, Ex, Po] # ordinal
+GarageCars         0.000000         5                                    [2, 3, 1, 0, 4] # no action
+SaleCondition      0.000000         6  [Normal, Abnorml, Partial, AdjLand, Alloca, Fa... # nominal +
+BsmtFinType1       0.025342         6                [GLQ, ALQ, Unf, Rec, BLQ, nan, LwQ] # nominal +
+BsmtFinType2       0.026027         6                [Unf, BLQ, nan, ALQ, Rec, LwQ, GLQ] # nominal
+GarageType         0.055479         6  [Attchd, Detchd, BuiltIn, CarPort, nan, Basmen... # nominal +
+Heating            0.000000         6              [GasA, GasW, Grav, Wall, OthW, Floor] # nominal+
+Foundation         0.000000         6         [PConc, CBlock, BrkTil, Wood, Slab, Stone] # nominal
+RoofStyle          0.000000         6         [Gable, Hip, Gambrel, Mansard, Flat, Shed] # nominal
+Functional         0.000000         7            [Typ, Min1, Maj1, Min2, Mod, Maj2, Sev] # nominal
+HouseStyle         0.000000         8  [2Story, 1Story, 1.5Fin, 1.5Unf, SFoyer, SLvl,... # nominal
+PoolArea           0.000000         8             [0, 512, 648, 576, 555, 480, 519, 738] # send to numeric
+BedroomAbvGr       0.000000         8                           [3, 4, 1, 2, 0, 5, 6, 8] # no action
+RoofMatl           0.000000         8  [CompShg, WdShngl, Metal, WdShake, Membran, Ta... # nominal
+Condition2         0.000000         8  [Norm, Artery, RRNn, Feedr, PosN, PosA, RRAn, ... # nominal
+OverallCond        0.000000         9                        [5, 8, 6, 7, 4, 2, 3, 9, 1] # no action
+Condition1         0.000000         9  [Norm, Feedr, PosN, Artery, RRAe, RRNn, RRAn, ... # nominal
+SaleType           0.000000         9  [WD, New, COD, ConLD, ConLI, CWD, ConLw, Con, ... # nominal
+OverallQual        0.000000        10                    [7, 6, 8, 5, 9, 4, 10, 3, 1, 2] # no action
+MoSold             0.000000        12            [2, 5, 9, 12, 10, 8, 11, 4, 1, 7, 3, 6] # no action
+TotRmsAbvGrd       0.000000        12           [8, 6, 7, 9, 5, 11, 4, 10, 12, 3, 2, 14] # no action
+Exterior1st        0.000000        15  [VinylSd, MetalSd, Wd Sdng, HdBoard, BrkFace, ... # nominal
+Exterior2nd        0.000000        16  [VinylSd, MetalSd, Wd Shng, HdBoard, Plywood, ... # nominal
+Neighborhood       0.000000        25  [CollgCr, Veenker, Crawfor, NoRidge, Mitchel, ...# nominal
