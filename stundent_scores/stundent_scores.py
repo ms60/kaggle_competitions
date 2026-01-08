@@ -11,12 +11,15 @@ from lightgbm import LGBMRegressor , LGBMClassifier
 from sklearn.model_selection import RandomizedSearchCV, GridSearchCV ,  train_test_split
 from sklearn.preprocessing import OneHotEncoder,OrdinalEncoder , StandardScaler , MinMaxScaler , FunctionTransformer
 
-from sklearn.metrics import mean_absolute_error, r2_score
+from sklearn.metrics import mean_absolute_error, r2_score , root_mean_squared_error
+
 from xgboost import XGBRegressor
 
 
 train = pd.read_csv("./data/train.csv")
 test = pd.read_csv("./data/test.csv")
+
+
 
 print(train.head())
 print(train.shape)
@@ -24,9 +27,45 @@ print(train.dtypes)
 
 print(train.isnull().sum()) # no missing column ez
 
+## feature engineering
+
+train["study_efficiency"] = train["study_hours"] * (train["class_attendance"] / 100.0)
+test["study_efficiency"] = test["study_hours"] * (test["class_attendance"] / 100.0)
+
+train["sleep_efficiency"] = train["sleep_hours"] * train["sleep_quality"].map({"poor":1,"average":2,"good":3})
+test["sleep_efficiency"] = test["sleep_hours"] * test["sleep_quality"].map({"poor":1,"average":2,"good":3})
+
+train["student_discipline_score"] = 0.4 * train["study_hours"] + 0.3 * train["class_attendance"] +0.3 * train["sleep_efficiency"]
+test["student_discipline_score"] = 0.4 * test["study_hours"] + 0.3 * test["class_attendance"] +0.3 * test["sleep_efficiency"]
+
+
+train["facility_study_interaction"] = train["study_hours"] * train["facility_rating"].map({"low":1,"medium":2,"high":3})
+test["facility_study_interaction"] = test["study_hours"] * test["facility_rating"].map({"low":1,"medium":2,"high":3})
+
+train["low_attendance_flag"] = train["class_attendance"] < 75.0
+test["low_attendance_flag"] = test["class_attendance"] < 75.0
+
+train["sleep_deprivation_flag"] = (train["sleep_hours"] < 6 ) & ( train["study_hours"] > 5 )
+test["sleep_deprivation_flag"] = (test["sleep_hours"] < 6 ) & ( test["study_hours"] > 5 )
+
+train["over_study_flag"] = train["study_hours"] > 8
+test["over_study_flag"] = test["study_hours"] > 8
+
+train["study_hours_squared"] = train["study_hours"] * train["study_hours"]
+test["study_hours_squared"] = test["study_hours"] * test["study_hours"]
+
+train["sleep_hours_squared"] = train["sleep_hours"] * train["sleep_hours"]
+test["sleep_hours_squared"] = test["sleep_hours"] * test["sleep_hours"]
+
+# study_hours_squared
+# sleep_hours_squared
+
+
+###
+
 cat_ordinal_cols = ["sleep_quality","facility_rating","exam_difficulty"]
-cat_nominal_cols = ["gender","course","age","internet_access","study_method"]
-num_cols = ["study_hours","class_attendance","sleep_hours"]
+cat_nominal_cols = ["gender","course","age","internet_access","study_method","low_attendance_flag","sleep_deprivation_flag","over_study_flag"]
+num_cols = ["study_hours","class_attendance","sleep_hours","study_efficiency","sleep_efficiency","student_discipline_score","facility_study_interaction","study_hours_squared","sleep_hours_squared"]
 
 target_col = ["exam_score"]
 
@@ -71,10 +110,10 @@ preprocessor = make_column_transformer(
 
 model = LGBMRegressor(
     n_estimators=2500,
-    learning_rate=0.05,
-    num_leaves=63,
-    max_depth=8,
-    feature_fraction=0.8,
+    learning_rate=0.04,
+    num_leaves=31,
+    max_depth=6,
+    feature_fraction=0.65,
     n_jobs=-1,
     verbosity=0,
     random_state=42
@@ -144,6 +183,7 @@ preds = pipe.predict(X_test)
 
 
 print("MAE:", mean_absolute_error(y_test, preds))
+print("RMSE",root_mean_squared_error(y_test,preds))
 print("R2 :", r2_score(y_test, preds))
 ######
 
