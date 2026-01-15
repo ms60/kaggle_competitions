@@ -7,6 +7,7 @@ from sklearn.linear_model import ElasticNet
 from sklearn.pipeline import make_pipeline
 
 from lightgbm import LGBMRegressor , LGBMClassifier , early_stopping , log_evaluation
+from xgboost import XGBRegressor
 
 from sklearn.model_selection import RandomizedSearchCV, GridSearchCV ,  train_test_split
 from sklearn.preprocessing import OneHotEncoder,OrdinalEncoder , StandardScaler , MinMaxScaler , FunctionTransformer
@@ -113,61 +114,10 @@ preprocessor = make_column_transformer(
 
 
 
-# model = ElasticNet(
-#     alpha=0.0005,
-#     l1_ratio=0.9,
-#     random_state=42
-# )
-
-# model = LGBMRegressor(
-#     n_estimators=2500,
-#     learning_rate=0.04,
-#     num_leaves=31,
-#     max_depth=6,
-#     feature_fraction=0.65,
-#     n_jobs=-1,
-#     verbosity=0,
-#     random_state=42
-# )
-
-# model = XGBRegressor(
-#     objective="reg:squarederror",  # regression için
-#     n_jobs=-1,
-#     random_state=42,
-#     verbosity=0
-# )
-
-# #random sampling
-# X_sample, _, y_sample, _ = train_test_split(
-#     train.drop(["id","exam_score"] , axis =1) , train["exam_score"], train_size=0.2, random_state=42
-# )
 
 
 X_train , X_test  , y_train , y_test = train_test_split(train.drop(["id","exam_score"] , axis =1) , train["exam_score"] , test_size=0.075, random_state=42)
 
-# data = preprocessor.fit_transform(X_train)
-# print(data)
-
-# model.fit(data,y_train)
-
-# preds = model.predict(X_test)
-
-
-# print("MAE:", mean_absolute_error(y_test, preds))
-# print("R2 :", r2_score(y_test, preds))
-
-
-
-# pipe = make_pipeline(
-#     preprocessor,
-#     model
-# )
-
-
-
-
-#rs.fit(X_train, y_train)
-#pipe.fit(X_train,y_train)
 
 X_train_proc = preprocessor.fit_transform(X_train)
 X_test_proc = preprocessor.transform(X_test)
@@ -175,41 +125,41 @@ X_test_proc = preprocessor.transform(X_test)
 def objective(trial):
 
     params = {
-        "objective": "regression",
-        "metric": "rmse",
-        "boosting_type": "gbdt",
-    
-        "verbosity": -1,
-        "verbose": -1,
-    
-        "force_row_wise": True,
     
         # model params
+        "tree_method": "hist",
+        "booster": trial.suggest_categorical("booster", ["gbtree", "dart"]),
+        "learning_rate": trial.suggest_float("learning_rate", 0.001 , 0.9, log=True),
+        "num_leaves": trial.suggest_int("num_leaves" ,10, 512),
         "learning_rate": trial.suggest_float("learning_rate", 0.01 , 0.9, log=True),
         "num_leaves": trial.suggest_int("num_leaves" ,10, 512),
         "max_depth": trial.suggest_int("max_depth", 3, 16),
         "min_child_samples": trial.suggest_int("min_child_samples", 10, 300),
+        "min_child_weight": trial.suggest_float("min_child_weight", 1.0, 10.0),
         "subsample": trial.suggest_float("subsample", 0.2, 1.0),
         "colsample_bytree": trial.suggest_float("colsample_bytree", 0.2, 1.0),
-        "reg_alpha": trial.suggest_float("reg_alpha", 1e-3, 10.0, log=True),
-        "reg_lambda": trial.suggest_float("reg_lambda", 1e-3, 10.0, log=True),
+        "lambda": trial.suggest_float("lambda", 1e-3, 10.0, log=True),   # L2
+        "alpha": trial.suggest_float("alpha", 1e-3, 10.0, log=True),     # L1
         "n_estimators":trial.suggest_int("n_estimators", 500 ,10000 ),
-        "random_state": 42,
-        "n_jobs": -1
+        'random_state': 42,
+        'eval_metric': 'rmse',
+        "objective": "reg:squarederror",
+        'early_stopping_rounds': 150,
+        "n_jobs": -1,
+
+
     }
 
 
 
-    model = LGBMRegressor(**params)
+
+    model = XGBRegressor(**params)
 
     model.fit(
         X_train_proc,
         y_train,
         eval_set=[(X_test_proc, y_test)],
-        eval_metric="rmse",
-        callbacks=[
-            early_stopping(stopping_rounds=100, verbose=False)
-        ]
+        verbose=1000
     )
 
     y_pred = model.predict(X_test_proc)
@@ -219,19 +169,36 @@ def objective(trial):
 
 study = optuna.create_study(
     direction="minimize",
-    study_name="lgb_exam_score"
+    study_name="xgb_exam_score"
 )
 
-study.optimize(objective, n_trials=100)
+study.optimize(objective, n_trials=50)
+
+xgb_params = {
+    'n_estimators': 15000,
+    'learning_rate': 0.007,
+    'max_depth': 6,
+    'subsample': 0.90,
+    'num_parallel_tree': 2,
+    'reg_lambda': 5,
+    'colsample_bytree': 0.5, 
+    'colsample_bynode': 0.7,
+    'tree_method': 'hist',
+    'random_state': 42,
+    'early_stopping_rounds': 100,
+    'eval_metric': 'rmse',
+    'enable_categorical': True,
+    'device': 'cuda',
+    'min_child_weight': 6
+} 
 
 best_params = study.best_params
 #best_params = {'learning_rate': 0.03000270673879387, 'num_leaves': 106, 'max_depth': 6, 'min_child_samples': 72, 'subsample': 0.911567996350799, 'colsample_bytree': 0.7179754224465255, 'reg_alpha': 0.023972346751633882, 'reg_lambda': 0.6469720859882682, 'n_estimators': 4575}
 
-final_model = LGBMRegressor(
+final_model = XGBRegressor(
     **best_params,
-    objective="regression",
+    #objective="regression",
 
-    random_state=42,
     n_jobs=-1
 )
 
@@ -239,11 +206,8 @@ final_model.fit(
     X_train_proc,
     y_train,
     eval_set=[(X_test_proc, y_test)],
-    eval_metric="rmse",
-    callbacks=[
-        early_stopping(stopping_rounds=100),
-        log_evaluation(100)
-    ]
+    verbose=1000
+
 )
 
 preds = final_model.predict( X_test_proc )
