@@ -3,7 +3,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import lightgbm as lgb
 #from lightgbm import early_stopping_ro
-
+from sklearn.metrics import mean_squared_error
+from sklearn.preprocessing import MinMaxScaler
 
 train = pd.read_csv("./data/train.csv")
 test = pd.read_csv("./data/test.csv")
@@ -15,26 +16,26 @@ train["date"] = pd.to_datetime(train["date"])
 test["date"] = pd.to_datetime(test["date"])
 
 
-# print(train.tail())
 
-# print(test.head())
-# print(train.shape)
-# print(train.isnull().sum())
+oil = pd.read_csv("./data/oil.csv")
+oil["date"] = pd.to_datetime( oil["date"] )
+oil["dcoilwtico"] = oil["dcoilwtico"].fillna(method="bfill")
 
-# print(train["store_nbr"].unique())
+transactions = pd.read_csv("./data/transactions.csv")
+transactions["date"] = pd.to_datetime(transactions["date"])
+
+holiday_events = pd.read_csv("./data/holidays_events.csv")
+holiday_events["date"] = pd.to_datetime(holiday_events["date"])
 
 
-# Naive	yₜ₊₁ = yₜ
-# Seasonal naive	yₜ₊ₛ
-# Moving average	Local mean
-# Drift	Linear extrapolation
-# 📌 Baseline geçilemiyorsa → proje çöktü
+stores = pd.read_csv("./data/stores.csv")
 
-#print(train.dtypes)
+oil_transactions = pd.merge( transactions , oil , how="left" , on="date")
+oil_transactions_stores = pd.merge(oil_transactions , stores , how="left" , on="store_nbr")
+oil_transactions_stores_holiday = pd.merge( oil_transactions_stores , holiday_events , how = "left", on="date" )
 
-# print(train.groupby("store_nbr").sum(["sales"]).drop("id",axis=1))
-
-# print(train.groupby("store_nbr").last("sales").drop("id",axis=1))
+train_all = pd.merge(train , oil_transactions_stores_holiday ,  how="left" , on=["date","store_nbr"])
+test_all = pd.merge(test , oil_transactions_stores_holiday ,  how="left" , on=["date","store_nbr"])
 
 stores_train = []
 
@@ -124,7 +125,7 @@ train["is_weekend"] = (train["dow"] >= 5).astype(int)
 train["sin_dow"] = np.sin(2 * np.pi * train["dow"] / 7)
 train["cos_dow"] = np.cos(2 * np.pi * train["dow"] / 7)
 
-LAGS = [1, 7, 14, 28]
+LAGS = [1, 3, 7, 10]
 
 for lag in LAGS:
     train[f"lag_{lag}"] = (
@@ -132,7 +133,7 @@ for lag in LAGS:
           .shift(lag)
     )
 
-WINDOWS = [7, 14, 28]
+WINDOWS = [3, 7, 10]
 
 for w in WINDOWS:
     train[f"roll_mean_{w}"] = (
@@ -182,13 +183,13 @@ test_df   = train_model[train_model["date"] >= cutoff_date]
 
 
 FEATURES = [
-    "lag_1","lag_7","lag_14","lag_28",
-    "roll_mean_7","roll_mean_14","roll_mean_28",
-    "roll_std_7","roll_std_14","roll_std_28",
+    "lag_1","lag_3","lag_7","lag_10",
+    "roll_mean_3","roll_mean_7","roll_mean_10",
+    "roll_std_3","roll_std_7","roll_std_10",
     "dow","week","month","is_weekend",
     "sin_dow","cos_dow",
     "onpromotion","promo_flag","promo_ratio",
-    "store_nbr","family"
+    "store_nbr","family" 
 ]
 
 X_train = train_df[FEATURES]
@@ -247,8 +248,10 @@ val_pred_log = model.predict(X_test)
 val_pred = np.expm1(val_pred_log)
 y_true = np.expm1(y_test)
 
-wape = np.sum(np.abs(y_true - val_pred)) / np.sum(y_true)
-print("WAPE:", wape)
+rmse = np.sqrt(mean_squared_error(y_true, val_pred))
+print("RMSE:", rmse)
+
+
 
 
 #################
@@ -256,8 +259,6 @@ print("WAPE:", wape)
 
 
 
-LAGS = [1, 7, 14, 28]
-WINDOWS = [7, 14, 28]
 
 def create_features_from_history(history, d):
     rows = []
@@ -307,6 +308,8 @@ def create_features_from_history(history, d):
 
         row["onpromotion"] = promo_val.iloc[0] if len(promo_val) > 0 else 0
         row["promo_flag"] = int(row["onpromotion"] > 0)
+
+        #row["dcoilwtico"] = test.loc[ test["date"]==d,"dcoilwtico"].iloc[0]
 
         rows.append(row)
 
@@ -370,4 +373,4 @@ submission = test.merge(
 
 #submission["sales"] = np.expm1(submission["sales"])
 submission = submission.sort_values("id")
-submission.to_csv("result.csv",index=False)
+submission[["id","sales"]].to_csv("result.csv",index=False)

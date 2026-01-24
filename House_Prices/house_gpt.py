@@ -7,6 +7,10 @@ from sklearn.preprocessing import OneHotEncoder, PowerTransformer
 from sklearn.impute import SimpleImputer
 from sklearn.linear_model import ElasticNet
 
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_absolute_error, r2_score , mean_squared_error , root_mean_squared_error
+import optuna
+
 # -----------------------
 # Load data
 # -----------------------
@@ -58,14 +62,39 @@ preprocessor = ColumnTransformer([
     ("cat", cat_pipe, cat_cols)
 ])
 
+# --------------------
+# Optuna
+# ---------------------
+
+X_train_split, X_valid, y_train_split, y_valid = train_test_split(
+    train, y, test_size=0.2, random_state=42
+)
+
+X_train_split_proc = preprocessor.fit_transform(X_train_split)
+X_valid_proc = preprocessor.transform(X_valid)
+
+def objective(trial):
+    params = {
+        "alpha": trial.suggest_float("alpha", 1e-4, 10.0, log=True),
+        "l1_ratio": trial.suggest_float("l1_ratio", 0.0, 1.0),
+        "fit_intercept": trial.suggest_categorical("fit_intercept", [True, False]),
+        "max_iter": trial.suggest_int("max_iter", 100, 5000),
+    }
+
+    model = ElasticNet(**params, random_state=42)
+    model.fit(X_train_split_proc, y_train_split)
+    preds = model.predict(X_valid_proc)
+
+    rmse = root_mean_squared_error(y_valid, preds)
+    return rmse  # minimize
+
+study = optuna.create_study(direction="minimize")
+study.optimize(objective, n_trials=50, timeout=600)
+
 # -----------------------
 # Model
 # -----------------------
-model = ElasticNet(
-    alpha=0.0005,
-    l1_ratio=0.9,
-    random_state=42
-)
+model = ElasticNet(**study.best_trial.params)
 
 pipe = Pipeline([
     ("prep", preprocessor),
