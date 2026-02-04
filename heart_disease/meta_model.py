@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import optuna
 from lightgbm import LGBMClassifier, early_stopping
+from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import roc_auc_score, root_mean_squared_error
 
@@ -25,46 +26,38 @@ X_train_meta, X_valid_meta, y_train_meta, y_valid_meta = train_test_split(
     X_meta, y, test_size=0.075, stratify=y, random_state=42
 )
 
-def objective(trial):
-    params = {
-        "boosting_type": "gbdt",    
-        "force_row_wise": True,
-        # model params
-        "learning_rate": trial.suggest_float("learning_rate", 0.01 , 0.9, log=True),
-        "num_leaves": trial.suggest_int("num_leaves" ,10, 512),
-        "max_depth": trial.suggest_int("max_depth", 3, 16),
-        "min_child_samples": trial.suggest_int("min_child_samples", 10, 300),
-        "subsample": trial.suggest_float("subsample", 0.2, 1.0),
-        "colsample_bytree": trial.suggest_float("colsample_bytree", 0.2, 1.0),
-        "reg_alpha": trial.suggest_float("reg_alpha", 1e-3, 10.0, log=True),
-        "reg_lambda": trial.suggest_float("reg_lambda", 1e-3, 10.0, log=True),
-        "n_estimators":trial.suggest_int("n_estimators", 100 ,10000 ),
-        "random_state": 42,
-        "n_jobs": -1,
-        'verbosity': -1
-    }
 
-    meta_model = LGBMClassifier(**params)
-    meta_model.fit(X_train_meta, y_train_meta ,
-                   eval_set=[(X_valid_meta, y_valid_meta)],
-                   eval_metric="roc_auc",
-                   callbacks=[early_stopping(200)])
-    y_pred = meta_model.predict_proba(X_valid_meta)[:, 1]
-    score = roc_auc_score(y_valid_meta, y_pred)
-    return score
+def objective(trial):
+    C = trial.suggest_float("C", 1e-3, 100.0, log=True)
+    model = LogisticRegression(
+    penalty="l2",      # ridge
+    C=C,             # CV ile tune edilebilir
+    solver="lbfgs",
+    max_iter=1000
+    )
+
+    model.fit(X_train_meta , y_train_meta)
+    probas = model.predict_proba(X_valid_meta)[:,1]
+
+    return roc_auc_score(y_valid_meta, probas)
 
 study = optuna.create_study(direction="maximize")
-study.optimize(objective, n_trials=50)
+study.optimize(objective, n_trials=100)
 
-print("Best meta AUC:", study.best_value)
+print("Best AUC:", study.best_value)
 print("Best params:", study.best_params)
 
-# En iyi parametrelerle tüm train OOF üzerinde meta modeli fit et
-best_params = study.best_params
-best_params.update({"random_state":42, "n_jobs":-1})
 
-meta_model = LGBMClassifier(**best_params)
-meta_model.fit(X_meta, y)
+best_C = study.best_params["C"]
+
+
+meta_model = LogisticRegression(
+    penalty="l2",      # ridge
+    C=best_C,             # CV ile tune edilebilir
+    solver="lbfgs",
+    max_iter=1000
+)
+meta_model.fit(X_train_meta, y_train_meta)
 
 # Test OOF'ları ile final tahmin
 ridge_test_oof = pd.read_csv("oof_pred_ridge_test.csv")
@@ -83,5 +76,5 @@ result = pd.DataFrame({
     "id": pd.read_csv("./data/test.csv")["id"],
     "Heart Disease": y_meta_test_pred
 })
-result.to_csv("meta_result_lgbm.csv", index=False)
-print("Meta model LGBM ile sonuç kaydedildi: meta_result_lgbm.csv")
+result.to_csv("meta_result_ridge.csv", index=False)
+print("Meta model Ridge ile sonuç kaydedildi: meta_result_ridge.csv")

@@ -23,18 +23,34 @@ X = train.drop("id",axis = 1)
 y = X.pop("Heart Disease")
 y = y.map({"Presence":1 , "Absence":0})
 
-print(X.head())
-print(y.head())
+# print(X.head())
+# print(y.head())
+
+
+X["ind_1"] = (X["Age"] > 40 ) & ( X["Exercise angina"] )
+X["ind_2"] = (X["Age"] > 50) &  (X["FBS over 120"] )
+X["ind_3"] = ( X["Exercise angina"] ) &  (X["ST depression"] > 1 )
+X["ind_4"] = ( X["Exercise angina"] ) & (X["FBS over 120"] )
+
+X["ind_5"] = (X["ind_4"] ) & ( X["EKG results"] > 0 )
+
+X["ind_6"] = X["ind_3"] &  X["ind_4"] & (X["Thallium"] == 3)
+
+X["ind_7"] = ( X["EKG results"] > 0 ) & ( X["Chest pain type"]==3 )
+X["ind_8"] = ( X["EKG results"] > 0 ) & ( X["Chest pain type"]==2 )
+
+X["ind_9"] =  ( X["Number of vessels fluro"] > 0 ) & (X["Age"] < 40) 
+
+X["ind_10"] =  (X["Sex"] ==1 )  & (X["Age"] > 40 ) & ( X["Cholesterol"] > 300 )
+X["ind_11"] =  (X["Sex"] ==1 )  & (X["Age"] > 40 ) & ( X["BP"] > 180 )
+
+
+for i in range(1,12):
+    X["ind_"+str(i)] = X["ind_"+str(i)].astype(int) 
 
 
 X_train , X_valid , y_train , y_valid = train_test_split(X,y,test_size=0.2, random_state=42,stratify=y)
 
-nominal_cols = ["Sex","Thallium"] 
-
-preprocess = make_column_transformer(
-    (TargetEncoder(cols=nominal_cols, smoothing=5),nominal_cols),
-    remainder="passthrough"
-)
 
 # model = LGBMClassifier()
 # model.fit(X_train,y_train)
@@ -61,31 +77,52 @@ preprocess = make_column_transformer(
 # submission.to_csv("submission.csv", index=False)
 # submission.head()
 
+        # "boosting_type": "gbdt",    
+        # "force_row_wise": True,
+        # # model params
+        # "learning_rate": trial.suggest_float("learning_rate", 0.01 , 0.9, log=True),
+        # "num_leaves": trial.suggest_int("num_leaves" ,10, 512),
+        # "max_depth": trial.suggest_int("max_depth", 3, 16),
+        # "min_child_samples": trial.suggest_int("min_child_samples", 10, 300),
+        # "subsample": trial.suggest_float("subsample", 0.2, 1.0),
+        # "colsample_bytree": trial.suggest_float("colsample_bytree", 0.2, 1.0),
+        # "reg_alpha": trial.suggest_float("reg_alpha", 1e-3, 10.0, log=True),
+        # "reg_lambda": trial.suggest_float("reg_lambda", 1e-3, 10.0, log=True),
+        # "n_estimators":trial.suggest_int("n_estimators", 100 ,10000 ),
+        # "random_state": 42,
+        # "n_jobs": -1,
+        # 'verbosity': -1
+
 def objective(trial):
 
     params= {
-        'n_estimators': trial.suggest_int('n_estimators', 100, 10000),
-        'max_depth': trial.suggest_int('max_depth', 3, 32),
-        'num_leaves': trial.suggest_int('num_leaves', 15, 255),
-        'learning_rate': trial.suggest_loguniform('learning_rate', 0.01, 0.9),
-        'min_child_samples': trial.suggest_int('min_child_samples', 5, 100),
-        'subsample': trial.suggest_float('subsample', 0.1, 1.0),
-        'colsample_bytree': trial.suggest_float('colsample_bytree', 0.1, 1.0),
-        'reg_alpha': trial.suggest_float('reg_alpha', 0.0, 1.0),
-        'reg_lambda': trial.suggest_float('reg_lambda', 0.0, 1.0),
-        'class_weight': None,  # dilersen 'balanced' da ekleyebilirsin
-        'random_state': 42,
-        'verbosity': -1
+    "boosting_type": trial.suggest_categorical("boosting_type", ["gbdt"]),
+    "objective": "binary",
+    "metric": "auc",
+    "n_estimators": trial.suggest_int("n_estimators", 100, 10000),
+    "learning_rate": trial.suggest_float("learning_rate", 0.005, 0.5, log=True),
+    "num_leaves": trial.suggest_int("num_leaves", 10, 512),
+    "max_depth": trial.suggest_int("max_depth", 3, 32),
+    "min_child_samples": trial.suggest_int("min_child_samples", 10, 300),
+    "min_child_weight": trial.suggest_float("min_child_weight", 1e-3, 10.0, log=True),
+    "min_split_gain": trial.suggest_float("min_split_gain", 0.0, 1.0),
+    "subsample": trial.suggest_float("subsample", 0.5, 1.0),
+    "subsample_freq": trial.suggest_int("subsample_freq", 1, 10),
+    "colsample_bytree": trial.suggest_float("colsample_bytree", 0.5, 1.0),
+    "reg_alpha": trial.suggest_float("reg_alpha", 1e-3, 10.0, log=True),
+    "reg_lambda": trial.suggest_float("reg_lambda", 1e-3, 10.0, log=True),
+    "max_bin": trial.suggest_int("max_bin", 64, 512),
+    "random_state": 42,
+    "verbosity": -1,
     }
 
-    X_train_proc = preprocess.fit_transform(X_train,y_train)
-    X_valid_proc = preprocess.transform(X_valid)
+
 
     model = LGBMClassifier(**params)
-    model.fit(X_train_proc,y_train)
+    model.fit(X_train,y_train)
 
     #y_preds = model.predict(X_valid)
-    y_proba = model.predict_proba(X_valid_proc)[:, 1]
+    y_proba = model.predict_proba(X_valid)[:, 1]
 
     score = roc_auc_score(y_valid, y_proba)
     

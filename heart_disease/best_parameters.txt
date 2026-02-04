@@ -20,3 +20,7 @@ Best params: {'n_estimators': 3409, 'max_depth': 4, 'num_leaves': 15, 'min_child
 lgbm
 Best meta AUC: 0.956606468064277
 Best params: {'learning_rate': 0.21993613614736332, 'num_leaves': 300, 'max_depth': 5, 'min_child_samples': 109, 'subsample': 0.5998364348999323, 'colsample_bytree': 0.9323188541883586, 'reg_alpha': 0.06461329411023, 'reg_lambda': 5.592155905490778, 'n_estimators': 6157}
+
+baseline + fe
+Best ROC AUC: 0.9563033067925033
+Best params: {'n_estimators': 1884, 'max_depth': 4, 'num_leaves': 36, 'learning_rate': 0.03227995761449489, 'min_child_samples': 84, 'subsample': 0.8341776102363694, 'colsample_bytree': 0.44276650765328784, 'reg_alpha': 0.016008766160654136, 'reg_lambda': 0.04095697300755011}

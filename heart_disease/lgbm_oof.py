@@ -9,6 +9,51 @@ X = train.drop("id",axis = 1)
 y = X.pop("Heart Disease")
 y = y.map({"Presence":1 , "Absence":0})
 
+X["ind_1"] = (X["Age"] > 40 ) & ( X["Exercise angina"] )
+X["ind_2"] = (X["Age"] > 50) &  (X["FBS over 120"] )
+X["ind_3"] = ( X["Exercise angina"] ) &  (X["ST depression"] > 1 )
+X["ind_4"] = ( X["Exercise angina"] ) & (X["FBS over 120"] )
+
+X["ind_5"] = (X["ind_4"] ) & ( X["EKG results"] > 0 )
+
+X["ind_6"] = X["ind_3"] &  X["ind_4"] & (X["Thallium"] == 3)
+
+X["ind_7"] = ( X["EKG results"] > 0 ) & ( X["Chest pain type"]==3 )
+X["ind_8"] = ( X["EKG results"] > 0 ) & ( X["Chest pain type"]==2 )
+
+X["ind_9"] =  ( X["Number of vessels fluro"] > 0 ) & (X["Age"] < 40) 
+
+X["ind_10"] =  (X["Sex"] ==1 )  & (X["Age"] > 40 ) & ( X["Cholesterol"] > 300 )
+X["ind_11"] =  (X["Sex"] ==1 )  & (X["Age"] > 40 ) & ( X["BP"] > 180 )
+
+X["ind_12"] =   (X["ST depression"] > 2.5 ) & ( X["Slope of ST"] >= 2 ) & (X["Age"] > 50   )
+
+
+for i in range(1,13):
+    X["ind_"+str(i)] = X["ind_"+str(i)].astype(int) 
+
+    test["ind_1"] = (test["Age"] > 40 ) & ( test["Exercise angina"] )
+test["ind_2"] = (test["Age"] > 50) &  (test["FBS over 120"] )
+test["ind_3"] = ( test["Exercise angina"] ) &  (test["ST depression"] > 1 )
+test["ind_4"] = ( test["Exercise angina"] ) & (test["FBS over 120"] )
+
+test["ind_5"] = (test["ind_4"] ) & ( test["EKG results"] > 0 )
+
+test["ind_6"] = test["ind_3"] &  test["ind_4"] & (test["Thallium"] == 3)
+
+test["ind_7"] = ( test["EKG results"] > 0 ) & ( test["Chest pain type"]==3 )
+test["ind_8"] = ( test["EKG results"] > 0 ) & ( test["Chest pain type"]==2 )
+
+test["ind_9"] =  ( test["Number of vessels fluro"] > 0 ) & (test["Age"] < 40) 
+
+test["ind_10"] =  (test["Sex"] ==1 )  & (test["Age"] > 40 ) & ( test["Cholesterol"] > 300 )
+test["ind_11"] =  (test["Sex"] ==1 )  & (test["Age"] > 40 ) & ( test["BP"] > 180 )
+
+test["ind_12"] =   (test["ST depression"] > 2.5 ) & ( test["Slope of ST"] >= 2 ) & (test["Age"] > 50   )
+
+for i in range(1,13):
+    test["ind_"+str(i)] = test["ind_"+str(i)].astype(int) 
+
 
 from optuna.samplers import TPESampler
 from lightgbm import LGBMClassifier, early_stopping, log_evaluation
@@ -51,14 +96,15 @@ def objective(trial):
     return score
 
 
-study = optuna.create_study(direction="maximize", sampler=TPESampler(seed=42))
-study.optimize(objective, n_trials=50)
+# study = optuna.create_study(direction="maximize", sampler=TPESampler(seed=42))
+# study.optimize(objective, n_trials=50)
 
-print("Best ROC AUC:", study.best_value)
-print("Best params:", study.best_params)
+# print("Best ROC AUC:", study.best_value)
+# print("Best params:", study.best_params)
 
 
-best_params = study.best_params  # Optuna’dan
+# best_params = study.best_params  # Optuna’dan
+best_params = {'n_estimators': 7025, 'max_depth': 22, 'num_leaves': 15, 'learning_rate': 0.012752427604733264, 'min_child_samples': 34, 'subsample': 0.6090293649529753, 'colsample_bytree': 0.12166593548807814, 'reg_alpha': 0.0038796943982102212, 'reg_lambda': 0.3101264295152337,"verbosity":-1}
 
 
 oof_pred_lgbm = np.zeros(len(X))
