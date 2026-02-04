@@ -1,176 +1,265 @@
-"""
-Refactored and corrected version of your pipeline with NaN-safe Ridge handling.
-Key fixes included:
- - consistent categorical lists between training, ridge OOF and test prediction
- - boolean -> int conversions
- - safeguards for column order when transforming test set
- - using model.best_iteration_ at predict time
- - rmse calculation compatible with older sklearn versions
- - NaN filling before Ridge and encoder usage
- - clearer comments and assertions
-
-Save this file and run in the same folder as your ./data/train.csv and ./data/test.csv
-"""
-
 import pandas as pd
 import numpy as np
 
 from sklearn.compose import make_column_transformer
-from sklearn.pipeline import make_pipeline
-from sklearn.model_selection import train_test_split, KFold
-from sklearn.linear_model import Ridge
-from sklearn.metrics import mean_squared_error
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.pipeline import Pipeline, make_pipeline
+from sklearn.model_selection import GridSearchCV, train_test_split, KFold
+from sklearn.linear_model import ElasticNet, Lasso, Ridge
+from sklearn.metrics import mean_squared_error, root_mean_squared_error
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
 from lightgbm import LGBMRegressor, early_stopping, log_evaluation
 from category_encoders import TargetEncoder
 
-# ---------- Helper functions ----------
+from itertools import combinations
+import optuna
 
-def rmse(y_true, y_pred):
-    return mean_squared_error(y_true, y_pred, squared=False)
+from sklearn.model_selection import cross_val_score
+from sklearn.linear_model import Ridge
+from xgboost import XGBRegressor
 
-# ---------- Read data ----------
+from category_encoders import TargetEncoder
+
+from sklearn.feature_selection import SequentialFeatureSelector
+from sklearn.preprocessing import FunctionTransformer
+
+
+
+
+#---------- Read data ----------
 train = pd.read_csv("./data/train.csv")
 test = pd.read_csv("./data/test.csv")
 
-# ---------- Consistent feature lists (important) ----------
-cat_nominal_ridge = ["gender", "course", "study_method"]  # for Ridge OOF
-cat_ordinal = ["internet_access", "sleep_quality", "facility_rating", "exam_difficulty"]
-num_basic = ["age", "study_hours", "class_attendance", "sleep_hours"]
+X = train.drop("id",axis=1).copy()
+y = X.pop("exam_score")
 
-# ---------- Basic mapping (ordinal) ----------
-ord_map = {
-    "internet_access": {"yes": 1, "no": 0},
-    "sleep_quality": {"poor": 0, "average": 1, "good": 2},
-    "facility_rating": {"low": 0, "medium": 1, "high": 2},
-    "exam_difficulty": {"easy": 0, "moderate": 1, "hard": 2},
-}
+X["internet_access"] = X["internet_access"].map({"yes":1 , "no":0})
+X["sleep_quality"] = X["sleep_quality"].map({"poor":-5 , "average":0.1 , "good":5 })
+X["facility_rating"] = X["facility_rating"].map({"low":-4 , "medium":0.1 , "high":4 })
+X["exam_difficulty"] = X["exam_difficulty"].map({"easy":1 , "moderate":2 , "hard":3 })
 
-for col, m in ord_map.items():
-    if col in train.columns:
-        train[col] = train[col].map(m)
-    if col in test.columns:
-        test[col] = test[col].map(m)
+X["study_method"] = X["study_method"].map({
+    'coaching': 10,
+    'mixed': 5,
+    'group study': 3,
+    'online videos': 2,
+    'self-study': 0.1
+})
 
-# ---------- Feature engineering ----------
 
-def add_features(df):
-    df = df.copy()
-    df["study_efficiency"] = df["study_hours"] * (df["class_attendance"] / 100.0)
-    df["sleep_efficiency"] = df["sleep_hours"] * df["sleep_quality"]
-    df["student_discipline_score"] = (
-        0.4 * df["study_hours"] + 0.3 * df["class_attendance"] + 0.3 * df["sleep_efficiency"]
+print(X.head())
+print(y.head())
+
+num_cols = ["age","study_hours","class_attendance","sleep_hours","study_method"]
+ordinal_cols = ["sleep_quality","facility_rating","exam_difficulty"]
+nominal_cols = ["gender","course","internet_access"]
+
+
+print( X.groupby("study_method")["internet_access"].count() )
+
+
+##FE
+num_cols_all = num_cols[:]
+
+#squares , log , sqrt
+for col in num_cols:
+    X[col + "_" + "squared" ] = X[col] * X[col]
+    X[col + "_" + "sqrt" ] = np.sqrt( X[col] )
+    X[col + "_" + "log" ] = np.log1p( X[col] )
+
+    num_cols_all.append(col + "_" + "squared")
+    num_cols_all.append(col + "_" + "sqrt")
+    num_cols_all.append(col + "_" + "log")
+
+# numeric interactions , multiply-division
+
+for col1, col2 in combinations(num_cols, 2):
+    X[col1 + "_multiply_" + col2] = X[col1] * X[col2]
+    X[col1 + "_divide_" + col2] = X[col1] / X[col2]
+
+    num_cols_all.append(col1 + "_multiply_" + col2)
+    num_cols_all.append(col1 + "_divide_" + col2)
+
+
+
+#ordinal interactions
+for col1, col2 in combinations(ordinal_cols, 2):
+    X[col1 + "_multiply_" + col2 ] = X[col1] * X[col2]
+    X[col1 + "_divide_" + col2 ] = X[col1] / X[col2]
+
+    num_cols_all.append(col1 + "_multiply_" + col2)
+    num_cols_all.append(col1 + "_divide_" + col2)
+
+#numeric - ordinal interactions
+
+for col1 in num_cols:
+    for col2 in ordinal_cols:
+        X[col1 + "_multiply_" + col2 ] = X[col1] * X[col2]
+        X[col1 + "_divide_" + col2 ] = X[col1] / X[col2]
+
+        num_cols_all.append(col1 + "_multiply_" + col2)
+        num_cols_all.append(col1 + "_divide_" + col2)
+
+
+
+######################################################33
+#squares , log , sqrt
+
+print(X.head())
+
+identity = FunctionTransformer(lambda x: x)
+
+preprocess = make_column_transformer(
+    (TargetEncoder(cols=nominal_cols,smoothing=10), nominal_cols),
+    #( OneHotEncoder(handle_unknown='ignore') , nominal_cols ) ,
+    ( StandardScaler() , num_cols_all ),
+    remainder="passthrough"
+
+)
+
+pipe = make_pipeline(
+    preprocess
     )
-    df["facility_study_interaction"] = df["study_hours"] * df["facility_rating"]
-    df["low_attendance_flag"] = (df["class_attendance"] < 75.0).astype(int)
-    df["sleep_deprivation_flag"] = ((df["sleep_hours"] < 6) & (df["study_hours"] > 5)).astype(int)
-    df["study_hours_squared"] = df["study_hours"] ** 2
-    df["study_hours_sqrt"] = np.sqrt(df["study_hours"])
-    df["study_hours_log"] = np.log1p(df["study_hours"])
-    df["study_hours_times_attendance"] = df["study_hours"] * df["class_attendance"]
-    df["study_hours_times_sleep"] = df["study_hours"] * df["sleep_hours"]
-    df["high_study_flag"] = (df["study_hours"] >= 7).astype(int)
-    return df
 
-train = add_features(train)
-test = add_features(test)
+# # models = {
+# #     "ridge": Ridge(alpha=1.0),
+# #     "lasso": Lasso(alpha=0.1),
+# #     "elastic": ElasticNet(alpha=0.1, l1_ratio=0.5),
+# #     #"rf": RandomForestRegressor(random_state=42),
+# #     "xgb":XGBRegressor(n_estimators=500),
+# #     "lgbm":LGBMRegressor(n_estimators=500),
+# # }
 
-X = train.drop(["id", "exam_score"], axis=1).copy()
-y = train["exam_score"].copy()
+# # for name, model in models.items():
+# #     pipe = make_pipeline(
+# #         preprocess,
+# #         model
+# #     )
 
-# ---------- Ridge OOF generation (NaN-safe) ----------
-X_oof = X.copy()
-X_oof["ridge_oof"] = np.nan
+# #     scores = cross_val_score(
+# #         pipe,
+# #         X,
+# #         y,
+# #         cv=5,
+# #         scoring="neg_root_mean_squared_error"
+# #     )
 
-kf = KFold(n_splits=5, shuffle=True, random_state=42)
+# #     print(name, "RMSE:", -scores.mean())
 
-ridge_pipe = make_pipeline(
-    TargetEncoder(cols=cat_nominal_ridge, smoothing=5),
-    Ridge(alpha=1.0)
+# X_sfs = X[num_cols_all] 
+
+# sfs = SequentialFeatureSelector(
+#     estimator=pipe,
+#     n_features_to_select=10,
+#     direction="forward",
+#     scoring="neg_root_mean_squared_error",
+#     cv=5,
+#     n_jobs=-1
+# )
+
+# sfs.fit(X_sfs, y)
+
+# selected_features = X.columns[sfs.get_support()]
+# print(selected_features)
+
+X_train , X_valid , y_train , y_valid = train_test_split(X,y,test_size=0.070, random_state=42)
+
+
+# kf = KFold(n_splits=10, shuffle=True, random_state=42)
+
+# oof_ridge = np.zeros(len(X))
+# test_preds_ridge = np.zeros((len(test), 10))
+# orig_preds_ridge = np.zeros(len(X))
+
+# ridge_alphas = np.logspace(-3, 3, 20)
+
+# print("Training Ridge Regression")
+# print("-" * 40)
+
+# for fold, (train_idx, val_idx) in enumerate(kf.split(X_train, y_train), 1):
+#     X_tr, X_val = X.iloc[train_idx], X.iloc[val_idx]
+#     y_tr, y_val = y_train.iloc[train_idx], y_train.iloc[val_idx]
+    
+#     # Augment with original data
+#     X_tr_aug = pd.concat([X_tr, X], axis=0)
+#     y_tr_aug = pd.concat([y_tr, y], axis=0)
+    
+#     # Target encode categoricals
+#     encoder = TargetEncoder(smooth='auto', target_type='continuous')
+#     X_tr_enc = X_tr_aug.copy()
+#     X_val_enc = X_val.copy()
+#     X_test_enc = test.copy()
+    
+#     X_tr_enc[nominal_cols] = encoder.fit_transform(X_tr_aug[nominal_cols], y_tr_aug)
+#     X_val_enc[nominal_cols] = encoder.transform(X_val[nominal_cols])
+#     X_test_enc[nominal_cols] = encoder.transform(X_valid[nominal_cols])
+    
+#     # Fit Ridge
+#     ridge = RidgeCV(alphas=ridge_alphas, cv=5, scoring='neg_root_mean_squared_error')
+#     ridge.fit(X_tr_enc, y_tr_aug.values.ravel())
+    
+#     # Predictions (clipped to valid range)
+#     oof_ridge[val_idx] = np.clip(ridge.predict(X_val_enc), 0, 100)
+#     test_preds_ridge[:, fold - 1] = np.clip(ridge.predict(X_test_enc), 0, 100)
+#     orig_preds_ridge += np.clip(ridge.predict(X_tr_enc.iloc[-len(X_original):]), 0, 100) / N_FOLDS
+    
+#     rmse = np.sqrt(mean_squared_error(y_val, oof_ridge[val_idx]))
+#     print(f"Fold {fold:2d} | RMSE: {rmse:.6f}")
+
+# ridge_oof_rmse = np.sqrt(mean_squared_error(y_train, oof_ridge))
+# print(f"\nRidge OOF RMSE: {ridge_oof_rmse:.6f}")
+
+X_train_proc = pipe.fit_transform(X_train,y_train)
+X_valid_proc = pipe.transform(X_valid)
+
+
+
+def objective(trial):
+
+    params = {
+        #'device': 'gpu',  # GPU acceleration
+        "objective": "regression",
+        "metric": "rmse",
+        "boosting_type": trial.suggest_categorical("boosting_type", ["gbdt"]), # ,"dart"
+        "verbosity": -1,
+        "force_row_wise": True,
+        "learning_rate": trial.suggest_float("learning_rate", 0.01, 0.9, log=True),
+        "num_leaves": trial.suggest_int("num_leaves", 10, 512),
+        "max_depth": trial.suggest_int("max_depth", 3, 32),
+        "min_child_samples": trial.suggest_int("min_child_samples", 10, 300),
+        "subsample": trial.suggest_float("subsample", 0.2, 1.0),
+        "colsample_bytree": trial.suggest_float("colsample_bytree", 0.2, 1.0),
+        "reg_alpha": trial.suggest_float("reg_alpha", 1e-3, 10.0, log=True),
+        "reg_lambda": trial.suggest_float("reg_lambda", 1e-3, 10.0, log=True),
+        "n_estimators": trial.suggest_int("n_estimators", 100, 10000),
+        "random_state": 42,
+        "n_jobs": -1
+    }
+
+
+    model = LGBMRegressor(**params)
+    #model = XGBRegressor(**params)
+
+    model.fit(
+        X_train_proc, y_train,
+        eval_set=[(X_valid_proc, y_valid)],
+        eval_metric="rmse",
+        callbacks=[early_stopping(200), log_evaluation(0)]
+    )
+
+    y_pred = model.predict(X_valid_proc, num_iteration=model.best_iteration_)
+    rmse = root_mean_squared_error(y_valid, y_pred)
+
+    return rmse
+
+study = optuna.create_study(
+    direction="minimize",
+    study_name="lgb_exam_score"
 )
 
-for fold, (tr_idx, val_idx) in enumerate(kf.split(X_oof)):
-    X_tr, X_val = X_oof.iloc[tr_idx], X_oof.iloc[val_idx]
-    y_tr, y_val = y.iloc[tr_idx], y.iloc[val_idx]
+study.optimize(objective, n_trials=100)
 
-    X_tr = X_tr.fillna(-999)
-    X_val = X_val.fillna(-999)
+best_params = study.best_params
+print(best_params)
 
-    ridge_pipe.fit(X_tr, y_tr)
-    preds = ridge_pipe.predict(X_val)
-    X_oof.iloc[val_idx, X_oof.columns.get_loc("ridge_oof")] = preds
-
-assert X_oof["ridge_oof"].isnull().sum() == 0, "OOF column contains NaNs"
-
-X_filtered = X_oof.copy()
-
-# ---------- Ridge full fit for test prediction ----------
-ridge_pipe_full = make_pipeline(
-    TargetEncoder(cols=cat_nominal_ridge, smoothing=5),
-    Ridge(alpha=1.0)
-)
-
-ridge_pipe_full.fit(X.fillna(-999), y)
-test["ridge_oof"] = ridge_pipe_full.predict(test[X.columns].fillna(-999))
-
-# ---------- Final preprocess ----------
-cat_nominal_final = ["study_method", "gender", "course"]
-cat_ordinal_final = ["sleep_quality", "facility_rating", "exam_difficulty"]
-
-num_cols_final = [
-    "ridge_oof", "age", "study_hours", "class_attendance", "sleep_hours",
-    "study_efficiency", "sleep_efficiency", "student_discipline_score", "facility_study_interaction",
-    "low_attendance_flag", "sleep_deprivation_flag", "study_hours_squared", "study_hours_sqrt",
-    "study_hours_log", "study_hours_times_attendance", "study_hours_times_sleep", "high_study_flag"
-]
-
-preprocess_filtered = make_column_transformer(
-    (OneHotEncoder(handle_unknown="ignore", sparse_output=False), cat_nominal_final),
-    (StandardScaler(), num_cols_final),
-    (StandardScaler(), cat_ordinal_final),
-    remainder="drop",
-)
-
-X_train, X_valid, y_train, y_valid = train_test_split(X_filtered, y, test_size=0.075, random_state=42)
-
-preprocess_filtered.fit(X_train)
-X_train_proc = preprocess_filtered.transform(X_train)
-X_valid_proc = preprocess_filtered.transform(X_valid)
-X_test_proc = preprocess_filtered.transform(test[X_train.columns].copy())
-
-# ---------- Model ----------
-test_params = {
-    'boosting_type': 'gbdt',
-    'learning_rate': 0.04652296188819206,
-    'num_leaves': 216,
-    'max_depth': 5,
-    'min_child_samples': 230,
-    'subsample': 0.9933406757691426,
-    'colsample_bytree': 0.26465493457945716,
-    'reg_alpha': 0.003176408880973185,
-    'reg_lambda': 0.10726491808899498,
-    'n_estimators': 7085,
-    'random_state': 42,
-    'n_jobs': -1,
-}
-
-model = LGBMRegressor(**test_params)
-
-model.fit(
-    X_train_proc, y_train,
-    eval_set=[(X_valid_proc, y_valid)],
-    eval_metric="rmse",
-    callbacks=[early_stopping(200), log_evaluation(0)],
-)
-
-best_iter = getattr(model, "best_iteration_", None)
-if best_iter is not None and best_iter > 0:
-    preds_test = model.predict(X_test_proc, num_iteration=best_iter)
-else:
-    preds_test = model.predict(X_test_proc)
-
-result = pd.DataFrame({"id": test["id"], "exam_score": preds_test})
-result.to_csv("result.csv", index=False)
-
-print("Finished successfully. result.csv saved.")

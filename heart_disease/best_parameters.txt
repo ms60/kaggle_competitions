@@ -1,0 +1,22 @@
+## bests
+# Best ROC AUC: 0.9563913356475379
+# Best params: {'n_estimators': 7025, 'max_depth': 22, 'num_leaves': 15, 'learning_rate': 0.012752427604733264, 'min_child_samples': 34, 'subsample': 0.6090293649529753, 'colsample_bytree': 0.12166593548807814, 'reg_alpha': 0.0038796943982102212, 'reg_lambda': 0.3101264295152337}
+
+# Best ROC AUC: 0.9563789402948262
+# Best params: {'n_estimators': 5613, 'max_depth': 5, 'num_leaves': 254, 'learning_rate': 0.013335190455676582, 'min_child_samples': 76, 'subsample': 0.6149990828235753, 'colsample_bytree': 0.1804665283299537, 'reg_alpha': 0.6399219443487499, 'reg_lambda': 0.8460546810433024}
+
+# Best meta AUC: 0.9566598136864055
+# Best params: {'n_estimators': 724, 'max_depth': 2, 'num_leaves': 153, 'min_child_samples': 99, 'learning_rate': 0.1387114580881059, 'subsample': 0.37549286841241186, 'colsample_bytree': 0.9077375200328026, 'reg_alpha': 0.6578963730687483, 'reg_lambda': 0.28960307157515247}
+
+
+
+# Best OOF AUC: 0.9556123435765762
+# Best params: {'n_estimators': 1632, 'learning_rate': 0.17175168294090398, 'max_depth': 2, 'min_child_weight': 4.763727616534478, 'gamma': 0.3489319192846541, 'subsample': 0.8825152879554319, 'colsample_bytree': 0.8948997823632672, 'reg_alpha': 3.0520520893575527, 'reg_lambda': 2.3573646452813284}
+
+xgb
+Best meta AUC: 0.9566447217460187
+Best params: {'n_estimators': 3409, 'max_depth': 4, 'num_leaves': 15, 'min_child_samples': 99, 'learning_rate': 0.1684214301847516, 'subsample': 0.9772643991731278, 'colsample_bytree': 0.9453450226985814, 'reg_alpha': 0.5577589164067142, 'reg_lambda': 0.3741296432515172}
+
+lgbm
+Best meta AUC: 0.956606468064277
+Best params: {'learning_rate': 0.21993613614736332, 'num_leaves': 300, 'max_depth': 5, 'min_child_samples': 109, 'subsample': 0.5998364348999323, 'colsample_bytree': 0.9323188541883586, 'reg_alpha': 0.06461329411023, 'reg_lambda': 5.592155905490778, 'n_estimators': 6157}

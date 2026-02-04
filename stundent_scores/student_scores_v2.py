@@ -16,6 +16,7 @@ import optuna
 from category_encoders import TargetEncoder
 from sklearn.model_selection import KFold
 from sklearn.linear_model import Ridge
+from xgboost import XGBRegressor
 
 train = pd.read_csv("./data/train.csv")
 
@@ -26,8 +27,8 @@ y = train["exam_score"]
 
 #ordinal mapping
 X["internet_access"] = X["internet_access"].map({"yes":1 , "no":0})
-X["sleep_quality"] = X["sleep_quality"].map({"poor":0 , "average":1 , "good":2 })
-X["facility_rating"] = X["facility_rating"].map({"low":0 , "medium":1 , "high":2 })
+X["sleep_quality"] = X["sleep_quality"].map({"poor":-2 , "average":0.01 , "good":2 })
+X["facility_rating"] = X["facility_rating"].map({"low":-5 , "medium":0.1 , "high":5 })
 X["exam_difficulty"] = X["exam_difficulty"].map({"easy":0 , "moderate":1 , "hard":2 })
 
 
@@ -165,36 +166,66 @@ X_valid_proc = preprocess_filtered.transform(X_valid)
 
 def objective(trial):
 
+    # params = {
+    #     #'device': 'gpu',  # GPU acceleration
+    #     "objective": "regression",
+    #     "metric": "rmse",
+    #     "boosting_type": trial.suggest_categorical("boosting_type", ["gbdt"]), # ,"dart"
+    #     "verbosity": -1,
+    #     "force_row_wise": True,
+    #     "learning_rate": trial.suggest_float("learning_rate", 0.01, 0.9, log=True),
+    #     "num_leaves": trial.suggest_int("num_leaves", 10, 512),
+    #     "max_depth": trial.suggest_int("max_depth", 3, 32),
+    #     "min_child_samples": trial.suggest_int("min_child_samples", 10, 300),
+    #     "subsample": trial.suggest_float("subsample", 0.2, 1.0),
+    #     "colsample_bytree": trial.suggest_float("colsample_bytree", 0.2, 1.0),
+    #     "reg_alpha": trial.suggest_float("reg_alpha", 1e-3, 10.0, log=True),
+    #     "reg_lambda": trial.suggest_float("reg_lambda", 1e-3, 10.0, log=True),
+    #     "n_estimators": trial.suggest_int("n_estimators", 100, 10000),
+    #     "random_state": 42,
+    #     "n_jobs": -1
+    # }
     params = {
-        #'device': 'gpu',  # GPU acceleration
-        "objective": "regression",
-        "metric": "rmse",
-        "boosting_type": trial.suggest_categorical("boosting_type", ["gbdt"]), # ,"dart"
-        "verbosity": -1,
-        "force_row_wise": True,
+        "objective": "reg:squarederror",
+        "tree_method": "hist",  # veya "gpu_hist" (GPU varsa)
+        "eval_metric": "rmse",
+        "booster": trial.suggest_categorical("booster", ["gbtree"]), #, "dart"
+        'early_stopping_rounds': 100,
+        
+        # Öğrenme oranı ve derinlik
         "learning_rate": trial.suggest_float("learning_rate", 0.01, 0.9, log=True),
-        "num_leaves": trial.suggest_int("num_leaves", 10, 512),
         "max_depth": trial.suggest_int("max_depth", 3, 32),
-        "min_child_samples": trial.suggest_int("min_child_samples", 10, 300),
-        "subsample": trial.suggest_float("subsample", 0.2, 1.0),
-        "colsample_bytree": trial.suggest_float("colsample_bytree", 0.2, 1.0),
-        "reg_alpha": trial.suggest_float("reg_alpha", 1e-3, 10.0, log=True),
-        "reg_lambda": trial.suggest_float("reg_lambda", 1e-3, 10.0, log=True),
+        "min_child_weight": trial.suggest_float("min_child_weight", 1.0, 10.0),
+        
+        # Düzenlileştirme
+        "lambda": trial.suggest_float("lambda", 1e-3, 10.0, log=True),   # L2
+        "alpha": trial.suggest_float("alpha", 1e-3, 10.0, log=True),     # L1
+        
+        # Alt örnekleme
+        "subsample": trial.suggest_float("subsample", 0.1, 1.0),
+        "colsample_bytree": trial.suggest_float("colsample_bytree", 0.1, 1.0),
+        
+        # DART için özel dropout parametreleri (booster=dart olduğunda aktif)
+        "rate_drop": trial.suggest_float("rate_drop", 0.0, 0.5),
+        "skip_drop": trial.suggest_float("skip_drop", 0.0, 0.5),
+        
+        # Ağaç sayısı
         "n_estimators": trial.suggest_int("n_estimators", 100, 10000),
+        "n_jobs": -1,
         "random_state": 42,
-        "n_jobs": -1
+        
     }
 
-    model = LGBMRegressor(**params)
+    #model = LGBMRegressor(**params)
+    model = XGBRegressor(**params)
 
     model.fit(
         X_train_proc, y_train,
         eval_set=[(X_valid_proc, y_valid)],
-        eval_metric="rmse",
-        callbacks=[early_stopping(200), log_evaluation(0)]
+        verbose=False
     )
 
-    y_pred = model.predict(X_valid_proc, num_iteration=model.best_iteration_)
+    y_pred = model.predict(X_valid_proc)
     rmse = root_mean_squared_error(y_valid, y_pred)
 
     return rmse
@@ -202,18 +233,71 @@ def objective(trial):
 
 
 
-# study = optuna.create_study(
-#     direction="minimize",
-#     study_name="lgb_exam_score"
-# )
+study = optuna.create_study(
+    direction="minimize",
+    study_name="lgb_exam_score"
+)
 
-# study.optimize(objective, n_trials=100)
+study.optimize(objective, n_trials=100)
 
-# best_params = study.best_params
+best_params = study.best_params
 
-# best_model = LGBMRegressor(**best_params)
+best_model = XGBRegressor(**best_params)
 
-# best_model.fit(
+best_model.fit(
+    X_train_proc, y_train,
+    eval_set=[(X_valid_proc, y_valid)],
+    verbose=False
+)
+
+
+y_pred = best_model.predict(X_valid_proc)
+rmse = root_mean_squared_error(y_valid, y_pred)
+print("Best RMSE on validation:", rmse)
+
+
+
+# test_params = {'boosting_type': 'gbdt', 'learning_rate': 0.04652296188819206, 'num_leaves': 216, 'max_depth': 5, 'min_child_samples': 230, 'subsample': 0.9933406757691426, 'colsample_bytree': 0.26465493457945716, 'reg_alpha': 0.003176408880973185, 'reg_lambda': 0.10726491808899498, 'n_estimators': 7085}
+
+# test_model = LGBMRegressor(**test_params)
+
+# test = pd.read_csv("./data/test.csv")
+
+# test["internet_access"] = test["internet_access"].map({"yes":1 , "no":0})
+# test["sleep_quality"] = test["sleep_quality"].map({"poor":0 , "average":1 , "good":2 })
+# test["facility_rating"] = test["facility_rating"].map({"low":0 , "medium":1 , "high":2 })
+# test["exam_difficulty"] = test["exam_difficulty"].map({"easy":0 , "moderate":1 , "hard":2 })
+
+# test["study_efficiency"] = test["study_hours"] * (test["class_attendance"] / 100.0)
+# test["sleep_efficiency"] = test["sleep_hours"] * test["sleep_quality"]
+# test["student_discipline_score"] = 0.4 * test["study_hours"] + 0.3 * test["class_attendance"] +0.3 * test["sleep_efficiency"]
+# test["facility_study_interaction"] = test["study_hours"] * test["facility_rating"]
+# test["low_attendance_flag"] = test["class_attendance"] < 75.0
+# test["sleep_deprivation_flag"] = (test["sleep_hours"] < 6 ) & ( test["study_hours"] > 5 )
+
+# test["study_hours_squared"] = test["study_hours"] * test["study_hours"]
+# test["study_hours_sqrt"] =  np.sqrt(test["study_hours"]) 
+# test["study_hours_log"] =  np.log1p(test["study_hours"]) 
+
+# test["study_hours_times_attendance"] = test["study_hours"] * test["class_attendance"]
+# test["study_hours_times_sleep"] = test["study_hours"] * test["sleep_hours"]
+
+# test['high_study_flag'] = (test['study_hours'] >= 7).astype(int)
+
+# print(X_filtered.columns)
+
+# ridge_pipe.fit(X_filtered.drop("ridge_oof",axis=1), y)
+# test["ridge_oof"] = ridge_pipe.predict(test.drop("id",axis=1))
+
+# print(test.head())
+
+# test_proc = preprocess_filtered.transform(test.drop("id",axis=1))
+
+
+# print(X_filtered.head())
+
+
+# test_model.fit(
 #     X_train_proc, y_train,
 #     eval_set=[(X_valid_proc, y_valid)],
 #     eval_metric="rmse",
@@ -221,61 +305,7 @@ def objective(trial):
 # )
 
 
-# y_pred = best_model.predict(X_valid_proc, num_iteration=best_model.best_iteration_)
-# rmse = root_mean_squared_error(y_valid, y_pred)
-# print("Best RMSE on validation:", rmse)
+# test_preds = test_model.predict(test_proc, num_iteration=test_model.best_iteration_)
 
-
-
-test_params = {'boosting_type': 'gbdt', 'learning_rate': 0.04652296188819206, 'num_leaves': 216, 'max_depth': 5, 'min_child_samples': 230, 'subsample': 0.9933406757691426, 'colsample_bytree': 0.26465493457945716, 'reg_alpha': 0.003176408880973185, 'reg_lambda': 0.10726491808899498, 'n_estimators': 7085}
-
-test_model = LGBMRegressor(**test_params)
-
-test = pd.read_csv("./data/test.csv")
-
-test["internet_access"] = test["internet_access"].map({"yes":1 , "no":0})
-test["sleep_quality"] = test["sleep_quality"].map({"poor":0 , "average":1 , "good":2 })
-test["facility_rating"] = test["facility_rating"].map({"low":0 , "medium":1 , "high":2 })
-test["exam_difficulty"] = test["exam_difficulty"].map({"easy":0 , "moderate":1 , "hard":2 })
-
-test["study_efficiency"] = test["study_hours"] * (test["class_attendance"] / 100.0)
-test["sleep_efficiency"] = test["sleep_hours"] * test["sleep_quality"]
-test["student_discipline_score"] = 0.4 * test["study_hours"] + 0.3 * test["class_attendance"] +0.3 * test["sleep_efficiency"]
-test["facility_study_interaction"] = test["study_hours"] * test["facility_rating"]
-test["low_attendance_flag"] = test["class_attendance"] < 75.0
-test["sleep_deprivation_flag"] = (test["sleep_hours"] < 6 ) & ( test["study_hours"] > 5 )
-
-test["study_hours_squared"] = test["study_hours"] * test["study_hours"]
-test["study_hours_sqrt"] =  np.sqrt(test["study_hours"]) 
-test["study_hours_log"] =  np.log1p(test["study_hours"]) 
-
-test["study_hours_times_attendance"] = test["study_hours"] * test["class_attendance"]
-test["study_hours_times_sleep"] = test["study_hours"] * test["sleep_hours"]
-
-test['high_study_flag'] = (test['study_hours'] >= 7).astype(int)
-
-print(X_filtered.columns)
-
-ridge_pipe.fit(X_filtered.drop("ridge_oof",axis=1), y)
-test["ridge_oof"] = ridge_pipe.predict(test.drop("id",axis=1))
-
-print(test.head())
-
-test_proc = preprocess_filtered.transform(test.drop("id",axis=1))
-
-
-print(X_filtered.head())
-
-
-test_model.fit(
-    X_train_proc, y_train,
-    eval_set=[(X_valid_proc, y_valid)],
-    eval_metric="rmse",
-    callbacks=[early_stopping(200), log_evaluation(0)]
-)
-
-
-test_preds = test_model.predict(test_proc, num_iteration=test_model.best_iteration_)
-
-result = pd.DataFrame( { "id":test["id"] , "exam_score":test_preds } )
-result.to_csv("result.csv",index=False)
+# result = pd.DataFrame( { "id":test["id"] , "exam_score":test_preds } )
+# result.to_csv("result.csv",index=False)
