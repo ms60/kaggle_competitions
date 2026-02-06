@@ -62,20 +62,20 @@ X["ind_12"] =   (X["ST depression"] > 2.5 ) & ( X["Slope of ST"] >= 2 ) & (X["Ag
 
 ###
 
-X["age_x_chol"] = X["Age"] * X["Cholesterol"]
-X["bp_x_hr"] = X["BP"] * X["Max HR"]
+# X["age_x_chol"] = X["Age"] * X["Cholesterol"]
+# X["bp_x_hr"] = X["BP"] * X["Max HR"]
 
-X["chol_hr_ratio"] = X["Cholesterol"] / (X["Max HR"] + 1)
-X["bp_age_ratio"] = X["BP"] / (X["Age"] + 1)
+# X["chol_hr_ratio"] = X["Cholesterol"] / (X["Max HR"] + 1)
+# X["bp_age_ratio"] = X["BP"] / (X["Age"] + 1)
 
-X["log_chol"] = np.log1p(X["Cholesterol"])
-X["sqrt_bp"] = np.sqrt(X["BP"])
+# X["log_chol"] = np.log1p(X["Cholesterol"])
+# X["sqrt_bp"] = np.sqrt(X["BP"])
 
-X["age_risk"] = pd.cut(
-    X["Age"],
-    bins=[0, 40, 55, 70, 100],
-    labels=[0,1,2,3]
-).astype(int)
+# X["age_risk"] = pd.cut(
+#     X["Age"],
+#     bins=[0, 40, 55, 70, 100],
+#     labels=[0,1,2,3]
+# ).astype(int)
 
 # X["num_mean"] = X[num_cols].mean(axis=1)
 # X["num_std"]  = X[num_cols].std(axis=1)
@@ -106,6 +106,22 @@ test["ind_11"] =  (test["Sex"] ==1 )  & (test["Age"] > 40 ) & ( test["BP"] > 180
 
 test["ind_12"] =   (test["ST depression"] > 2.5 ) & ( test["Slope of ST"] >= 2 ) & (test["Age"] > 50   )
 
+
+# test["age_x_chol"] = test["Age"] * test["Cholesterol"]
+# test["bp_x_hr"] = test["BP"] * test["Max HR"]
+
+# test["chol_hr_ratio"] = test["Cholesterol"] / (test["Max HR"] + 1)
+# test["bp_age_ratio"] = test["BP"] / (test["Age"] + 1)
+
+# test["log_chol"] = np.log1p(test["Cholesterol"])
+# test["sqrt_bp"] = np.sqrt(test["BP"])
+
+# test["age_risk"] = pd.cut(
+#     test["Age"],
+#     bins=[0, 40, 55, 70, 100],
+#     labels=[0,1,2,3]
+# ).astype(int)
+
 for i in range(1,13):
     test["ind_"+str(i)] = test["ind_"+str(i)].astype(int) 
 
@@ -127,15 +143,15 @@ num_cols = ["Age","BP","Cholesterol","Max HR","ST depression","Slope of ST"]
 ordinal_cols = ["EKG results","Number of vessels fluro" ]
 yes_or_no = ["FBS over 120","Exercise angina"]
 
-ordinal_cols.append("age_risk")
-num_cols.append("age_x_chol")
-num_cols.append("bp_x_hr")
+# ordinal_cols.append("age_risk")
+# num_cols.append("age_x_chol")
+# num_cols.append("bp_x_hr")
 
-num_cols.append("chol_hr_ratio")
-num_cols.append("bp_age_ratio")
+# num_cols.append("chol_hr_ratio")
+# num_cols.append("bp_age_ratio")
 
-num_cols.append("log_chol")
-num_cols.append("sqrt_bp")
+# num_cols.append("log_chol")
+# num_cols.append("sqrt_bp")
 
 num_all_cols = num_cols + ordinal_cols
 
@@ -198,14 +214,14 @@ non_tree_models = {
     #     ))
     # ]),
     
-    # "sgdc": Pipeline([
-    #     ("prep", preprocess),
-    #     ("model", SGDClassifier(
-    #         loss="log_loss",
-    #         class_weight="balanced",
-    #         random_state=42
-    #     ))
-    # ]),
+    "sgdc": Pipeline([
+        ("prep", preprocess),
+        ("model", SGDClassifier(
+            loss="log_loss",
+            class_weight="balanced",
+            random_state=42
+        ))
+    ]),
 
     "lgstc_all": Pipeline([
         ("prep", preprocess),
@@ -229,13 +245,17 @@ non_tree_models = {
 
     "lgstc_ridge": Pipeline([
         ("prep", preprocess),
-        ("model", LogisticRegression(
-            penalty="l2",
-            solver="lbfgs",
-            max_iter=1000,
-            random_state=42
-        ))
+        ("model", lgstc_ridge)
     ]),
+    "lgstc_elasticnet":Pipeline([
+        ("prep",preprocess),
+        ("model",lgstc_elasticnet)
+    ]),
+
+    "lgstc_lasso":Pipeline([
+        ("prep",preprocess),
+        ("model",lgstc_lasso)
+    ])
 }
 
 tree_models = {
@@ -281,49 +301,90 @@ oof_df = pd.DataFrame(model_oofs)
 corr = oof_df.corr()
 print(corr)
 
+selected_models = models
 
 # selected_models = {
-#     "xgb": xgb,
-#     "lgstc_ridge": lgstc_ridge,   # pipeline’lı
-#     "rfc": rfc,
-#     "ada": ada
+#     "lgbm": models["lgbm"],
+#     "lgstc_ridge": models["lgstc_ridge"],   # pipeline’lı
+#     "knn_local": models["knn_local"],
+#     "ada": models["ada"],
+#     "nb_dist":models["nb_dist"]
 # }
 
-# n_folds = skf.n_splits
+n_folds = skf.n_splits
 
-# oof_preds = {m: np.zeros(len(X)) for m in selected_models}
-# test_preds = {m: np.zeros(len(test.drop("id",axis=1))) for m in selected_models}
+oof_preds = {m: np.zeros(len(X)) for m in selected_models}
+test_preds = {m: np.zeros(len(test.drop("id",axis=1))) for m in selected_models}
 
-# for fold, (tr_idx, val_idx) in enumerate(skf.split(X, y)):
-#     print(f"\nFOLD {fold}")
+for fold, (tr_idx, val_idx) in enumerate(skf.split(X, y)):
+    print(f"\nFOLD {fold}")
 
-#     X_tr, X_val = X.iloc[tr_idx], X.iloc[val_idx]
-#     y_tr, y_val = y.iloc[tr_idx], y.iloc[val_idx]
+    X_tr, X_val = X.iloc[tr_idx], X.iloc[val_idx]
+    y_tr, y_val = y.iloc[tr_idx], y.iloc[val_idx]
 
-#     for model_name, base_model in selected_models.items():
-#         model = clone(base_model)
-#         model.fit(X_tr, y_tr)
+    for model_name, base_model in selected_models.items():
+        model = clone(base_model)
+        model.fit(X_tr, y_tr)
 
-#         # ---- OOF ----
-#         oof_pred = model.predict_proba(X_val)[:, 1]
-#         oof_preds[model_name][val_idx] = oof_pred
+        # ---- OOF ----
+        oof_pred = model.predict_proba(X_val)[:, 1]
+        oof_preds[model_name][val_idx] = oof_pred
 
-#         # ---- TEST ----
-#         test_pred = model.predict_proba(test.drop("id",axis=1))[:, 1]
-#         test_preds[model_name] += test_pred / n_folds
+        # ---- TEST ----
+        test_pred = model.predict_proba(test.drop("id",axis=1))[:, 1]
+        test_preds[model_name] += test_pred / n_folds
 
-#         fold_auc = roc_auc_score(y_val, oof_pred)
-#         print(f"{model_name:12s} | fold AUC = {fold_auc:.4f}")
+        fold_auc = roc_auc_score(y_val, oof_pred)
+        print(f"{model_name:12s} | fold AUC = {fold_auc:.4f}")
 
 
-# for m in oof_preds:
-#     auc = roc_auc_score(y, oof_preds[m])
-#     print(f"{m:12s} OOF AUC = {auc:.4f}")
+for m in oof_preds:
+    auc = roc_auc_score(y, oof_preds[m])
+    print(f"{m:12s} OOF AUC = {auc:.4f}")
 
-# X_meta_train = pd.DataFrame(oof_preds)
-# X_meta_test = pd.DataFrame(test_preds)
 
-# meta = Ridge(alpha=1.0)
+
+
+
+
+
+X_meta_train = pd.DataFrame(oof_preds)
+X_meta_test = pd.DataFrame(test_preds)
+
+X_meta_train.to_csv("./data/oof_train.csv",index=False)
+X_meta_test.to_csv("./data/oof_test.csv",index=False)
+
+
+# X_meta = X_meta_train.values
+# y_meta = y.values
+
+# def objective(trial):
+#     alpha = trial.suggest_float("alpha", 1e-4, 100, log=True)
+    
+#     meta = Ridge(alpha=alpha, random_state=42)
+
+#     cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+#     aucs = []
+
+#     for tr_idx, val_idx in cv.split(X_meta, y_meta):
+#         X_tr, X_val = X_meta[tr_idx], X_meta[val_idx]
+#         y_tr, y_val = y_meta[tr_idx], y_meta[val_idx]
+
+#         meta.fit(X_tr, y_tr)
+#         preds = meta.predict(X_val)
+#         aucs.append(roc_auc_score(y_val, preds))
+
+#     return np.mean(aucs)
+
+# study = optuna.create_study(direction="maximize")
+# study.optimize(objective, n_trials=50)
+
+# print("Best alpha:", study.best_params["alpha"])
+# print("Best AUC:", study.best_value)
+
+
+
+# meta = Ridge(alpha=study.best_params["alpha"])
 # meta.fit(X_meta_train, y)
 
 # test_meta_pred = meta.predict(X_meta_test)
@@ -338,7 +399,7 @@ print(corr)
 # })
 
 # submission.to_csv("ridge_meta_submission.csv", index=False)
-# #######
+#######
 
 
 
