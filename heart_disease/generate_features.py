@@ -93,7 +93,8 @@ y = X.pop("Heart Disease")
 y = y.map({"Presence":1 , "Absence":0})
 
 
-lgbm_params = {'n_estimators': 724, 'max_depth': 2, 'num_leaves': 153, 'min_child_samples': 99, 'learning_rate': 0.1387114580881059, 'subsample': 0.37549286841241186, 'colsample_bytree': 0.9077375200328026, 'reg_alpha': 0.6578963730687483, 'reg_lambda': 0.28960307157515247}
+lgbm_params = {'boosting_type': 'gbdt', 'n_estimators': 741, 'learning_rate': 0.08167538515222256, 'num_leaves': 28, 'max_depth': 13, 'min_child_samples': 222, 'subsample': 0.5879958997728245, 'colsample_bytree': 0.1485889641548193, 'reg_alpha': 0.0021996358082814254, 'reg_lambda': 0.0164658861653131}
+#{'n_estimators': 724, 'max_depth': 2, 'num_leaves': 153, 'min_child_samples': 99, 'learning_rate': 0.1387114580881059, 'subsample': 0.37549286841241186, 'colsample_bytree': 0.9077375200328026, 'reg_alpha': 0.6578963730687483, 'reg_lambda': 0.28960307157515247}
 
 print(X.head())
 
