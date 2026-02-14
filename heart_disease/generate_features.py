@@ -1,115 +1,225 @@
-from itertools import combinations
 from lightgbm import LGBMClassifier
-
-
-
-
 import numpy as np
 import pandas as pd
-
-from sklearn.model_selection import StratifiedKFold, train_test_split
-from sklearn.metrics import roc_auc_score
-
-def genereate_gt_lt_num(df,num_cols,step_counts):
-    num_lt_gt_combinations = {} 
-    for col in num_cols:
-        max = df[col].max()
-        min = df[col].min()
-        for step in step_counts:
-            step_value = (max - min) / step
-            for i in range(1,step+1):
-                num_lt_gt_combinations[col+"_lt_" + str(min + step_value*i) ] = df[col] < (min + step_value*i)
-                num_lt_gt_combinations[col+"_gt_" + str(max - step_value*i) ] = df[col] > (max - step_value*i)
-    return num_lt_gt_combinations
+from copy import deepcopy
+from sklearn.model_selection import StratifiedKFold, cross_val_score
 
 
-def generate_category_equality(df,nominal_cols):
-    nominal_eq_combinations = {}
-    for col in nominal_cols:
-        for value in df[col].unique():
-            nominal_eq_combinations[ col + "_eq_" + str(value) ] = (df[col] == value )
-    
-    return nominal_eq_combinations
+class IndicatorFeatureGenerator:
+    def __init__(
+        self,
+        model,
+        metric,
+        cv=5,
+        min_gain=1e-4,
+        random_state=42
+    ):
+        """
+        model  : sklearn / lgbm compatible classifier
+        metric : string (e.g. 'roc_auc')
+        """
+        self.model = model
+        self.metric = metric
+        self.cv = cv
+        self.min_gain = min_gain
+        self.random_state = random_state
 
+        self.kept_features = []
+        self.feature_defs = {}
+        self.base_score = None
 
-def generate_cross_combinations_same(d1):
-    cross_comb_same = {}
-    for col1, col2 in combinations(d1.keys(), 2):
-        cross_comb_same[ col1 + "_and_" + col2 ] = d1[col1] & d1[col2]
-        cross_comb_same[ col1 + "_or_" + col2 ] = d1[col1] | d1[col2]
-    return cross_comb_same
+    # --------------------------------------------------
+    def baseline_score(self, X, y):
+        cv = StratifiedKFold(self.cv, shuffle=True, random_state=self.random_state)
+        score = cross_val_score(
+            self.model, X, y,
+            scoring=self.metric,
+            cv=cv,
+            n_jobs=-1
+        ).mean()
+        self.base_score = score
+        return score
 
-def generate_cross_combinations_different(d1,d2):
-    cross_comb_different = {}
-    for col1 in d1.keys():
-        for col2 in d2.keys():
-            cross_comb_different[ col1 + "_and_" + col2 ] = d1[col1] & d2[col2]
-            cross_comb_different[ col1 + "_or_" + col2 ] = d1[col1] | d2[col2]
-    return cross_comb_different
+    # --------------------------------------------------
+    def generate_atomic_candidates(
+        self,
+        X,
+        numeric_cols,
+        categorical_cols,
+        binary_cols,
+        percentiles=(10, 25, 50, 75),
+    ):
+        """
+        Atomic building blocks:
+        - num > percentile
+        - num < percentile
+        - cat == value
+        - binary == 1
+        """
+        candidates = {}
 
-def generate_useful_features(model,X_,y ,features):
-    X = X_.copy()
-    X_train , X_valid , y_train , y_valid = train_test_split(X,y,test_size=0.075,random_state=42,stratify=y)
-   
-    model.fit(X_train , y_train)
-    #y_preds = model.predict(X_valid)
-    y_proba = model.predict_proba(X_valid)[:, 1]
+        # numeric thresholds
+        for col in numeric_cols:
+            qs = np.percentile(X[col].dropna(), percentiles)
+            for q, p in zip(qs, percentiles):
+                candidates[f"{col}_gt_p{p}"] = lambda df, c=col, v=q: (df[c] > v)
+                candidates[f"{col}_lt_p{p}"] = lambda df, c=col, v=q: (df[c] < v)
 
-    baseline_score = roc_auc_score(y_valid, y_proba)
-    print("baseline score:" , baseline_score)
-    
-    for feature in features.keys():
-        X[feature] = features[feature]
-        
-        X_train , X_valid , y_train , y_valid = train_test_split(X,y,test_size=0.075,random_state=42,stratify=y)
-        
-        model.fit(X_train , y_train)
-        #y_preds = model.predict(X_valid)
-        y_proba = model.predict_proba(X_valid)[:, 1]
-        score = roc_auc_score(y_valid, y_proba)
+        # categorical
+        for col in categorical_cols:
+            for val in X[col].dropna().unique():
+                candidates[f"{col}_eq_{val}"] = (
+                    lambda df, c=col, v=val: (df[c] == v)
+                )
 
-        if score < baseline_score:
-            X.pop(feature)
+        # binary
+        for col in binary_cols:
+            candidates[f"{col}_is1"] = lambda df, c=col: (df[c] == 1)
 
-    return X
+        return candidates
 
-        
-    
+    # --------------------------------------------------
+    def evaluate_single_feature(self, X, y, feature_name, feature_fn):
+        X_tmp = X.copy()
+        X_tmp[feature_name] = feature_fn(X_tmp).astype(int)
 
-    
-   
+        cv = StratifiedKFold(self.cv, shuffle=True, random_state=self.random_state)
+        score = cross_val_score(
+            self.model,
+            X_tmp,
+            y,
+            scoring=self.metric,
+            cv=cv,
+            n_jobs=-1
+        ).mean()
 
-    
+        return score
 
+    # --------------------------------------------------
+    def safe_discovery(self, X, y, candidates):
+        """
+        ekle → dene → çıkar
+        """
+        if self.base_score is None:
+            self.baseline_score(X, y)
 
+        for name, fn in candidates.items():
+            score = self.evaluate_single_feature(X, y, name, fn)
 
-#---------------------------------------------------------------
+            if score > self.base_score + self.min_gain:
+                self.kept_features.append(name)
+                self.feature_defs[name] = fn
+                print(f"[KEEP] {name}  +{score - self.base_score:.5f}")
+
+        return self.kept_features
+
+    # --------------------------------------------------
+    def greedy_interactions(self, X, y, max_depth=3):
+        """
+        forward greedy interactions:
+        kept_i & candidate_j
+        """
+        new_features = {}
+
+        for kept_name in self.kept_features:
+            kept_fn = self.feature_defs[kept_name]
+
+            for other_name, other_fn in self.feature_defs.items():
+                if kept_name == other_name:
+                    continue
+
+                new_name = f"{kept_name}__AND__{other_name}"
+
+                def combined(df, f1=kept_fn, f2=other_fn):
+                    return f1(df) & f2(df)
+
+                new_features[new_name] = combined
+
+        for name, fn in new_features.items():
+            score = self.evaluate_single_feature(X, y, name, fn)
+
+            if score > self.base_score + self.min_gain:
+                self.kept_features.append(name)
+                self.feature_defs[name] = fn
+                self.base_score = score
+                print(f"[GREEDY KEEP] {name}")
+
+        return self.kept_features
+
+    # --------------------------------------------------
+    def prune_features(self, X, y):
+        """
+        çıkar → dene
+        """
+        pruned = []
+
+        for fname in list(self.kept_features):
+            X_tmp = X.copy()
+
+            for other in self.kept_features:
+                if other != fname:
+                    X_tmp[other] = self.feature_defs[other](X_tmp).astype(int)
+
+            cv = StratifiedKFold(self.cv, shuffle=True, random_state=self.random_state)
+            score = cross_val_score(
+                self.model,
+                X_tmp,
+                y,
+                scoring=self.metric,
+                cv=cv,
+                n_jobs=-1
+            ).mean()
+
+            if score < self.base_score:
+                pruned.append(fname)
+                self.kept_features.remove(fname)
+                print(f"[PRUNE] {fname}")
+
+        return pruned
+
+    # --------------------------------------------------
+    def transform(self, X):
+        X_new = X.copy()
+        for name in self.kept_features:
+            X_new[name] = self.feature_defs[name](X_new).astype(int)
+        return X_new
+
 
 train = pd.read_csv("./data/train.csv")
 test = pd.read_csv("./data/test.csv")
 
-X = train.drop("id",axis = 1)
+X = train.drop("id", axis=1)
 y = X.pop("Heart Disease")
-y = y.map({"Presence":1 , "Absence":0})
+y = y.map({"Presence": 1, "Absence": 0})
 
+numeric_cols = [
+    "ST depression",
+    "Age",  "Cholesterol",
+    "Max HR", "BP"
+]
 
-lgbm_params = {'boosting_type': 'gbdt', 'n_estimators': 741, 'learning_rate': 0.08167538515222256, 'num_leaves': 28, 'max_depth': 13, 'min_child_samples': 222, 'subsample': 0.5879958997728245, 'colsample_bytree': 0.1485889641548193, 'reg_alpha': 0.0021996358082814254, 'reg_lambda': 0.0164658861653131}
-#{'n_estimators': 724, 'max_depth': 2, 'num_leaves': 153, 'min_child_samples': 99, 'learning_rate': 0.1387114580881059, 'subsample': 0.37549286841241186, 'colsample_bytree': 0.9077375200328026, 'reg_alpha': 0.6578963730687483, 'reg_lambda': 0.28960307157515247}
+categorical_cols = [
+    "EKG results","Thallium", "Chest pain type","Slope of ST","Number of vessels fluro"
+]
 
-print(X.head())
+binary_cols = [
+    "Exercise angina","Sex", "FBS over 120" 
+]
 
-numeric_cols = ["Age","BP","Cholesterol","Max HR","ST depression","Slope of ST","Number of vessels fluro"]
-categorical_cols = ["Thallium","Chest pain type","EKG results"]
-binary_cols = ["Sex","Exercise angina","FBS over 120"]
+gen = IndicatorFeatureGenerator(
+    model=LGBMClassifier(),
+    metric="roc_auc"
+)
 
-model = LGBMClassifier(**lgbm_params , verbose=-1)
+candidates = gen.generate_atomic_candidates(
+    X,
+    numeric_cols,
+    categorical_cols,
+    binary_cols
+)
 
-num_features = genereate_gt_lt_num(X,numeric_cols , [6 , 5 , 5, 5, 5 , 5 , 3] )
-cat_features = generate_category_equality(X,categorical_cols)
+gen.safe_discovery(X, y, candidates)
+gen.greedy_interactions(X, y)
+gen.prune_features(X, y)
 
-num_features_cross = generate_cross_combinations_same(num_features)
-cat_features_cross = generate_cross_combinations_same(cat_features)
-
-total = generate_cross_combinations_different(num_features,cat_features_cross).keys()
-
-print(total)
+X_new = gen.transform(X)

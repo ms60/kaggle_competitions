@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 from itertools import combinations, product
 from sklearn.metrics import roc_auc_score
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import cross_val_score, train_test_split
 from tqdm import tqdm
 
 import resource
@@ -116,30 +116,38 @@ def greedy_auc_feature_addition(
 ):
     X_work = X.copy()
 
-    X_tr, X_val, y_tr, y_val = train_test_split(
-        X_work,
-        y,
-        test_size=test_size,
-        stratify=y,
-        random_state=random_state
-    )
+    # X_tr, X_val, y_tr, y_val = train_test_split(
+    #     X_work,
+    #     y,
+    #     test_size=test_size,
+    #     stratify=y,
+    #     random_state=random_state
+    # )
 
-    #model.fit(X_tr, y_tr)
-    for col in X.columns:
-        X[col] = X[col].astype(str)
+    # model.fit(X_tr, y_tr)
+    # # for col in X.columns:
+    # #     X[col] = X[col].astype(str)
 
-    cat_features = list(range(X.shape[1]))
-    model.fit(
-        X_tr, y_tr,
-        eval_set=(X_val, y_val),
-        cat_features=cat_features,
-        early_stopping_rounds=200,
-        use_best_model=True
-    )
-    base_auc = roc_auc_score(
-        y_val,
-        model.predict_proba(X_val)[:, 1]
-    )
+    # # cat_features = list(range(X.shape[1]))
+    # # model.fit(
+    # #     X_tr, y_tr,
+    # #     eval_set=(X_val, y_val),
+    # #     cat_features=cat_features,
+    # #     early_stopping_rounds=200,
+    # #     use_best_model=True
+    # # )
+    # base_auc = roc_auc_score(
+    #     y_val,
+    #     model.predict_proba(X_val)[:, 1]
+    # )
+
+    base_auc = cross_val_score(
+        model,
+        X_work, y,
+        cv=3,
+        scoring="roc_auc",
+        n_jobs=-1
+    ).mean()
 
     print(f"Initial AUC: {base_auc:.5f}")
 
@@ -152,27 +160,35 @@ def greedy_auc_feature_addition(
     ):
         X_work[name] = col.astype("int8")
 
-        X_tr, X_val, y_tr, y_val = train_test_split(
-            X_work,
-            y,
-            test_size=test_size,
-            stratify=y,
-            random_state=random_state
-        )
+        # X_tr, X_val, y_tr, y_val = train_test_split(
+        #     X_work,
+        #     y,
+        #     test_size=test_size,
+        #     stratify=y,
+        #     random_state=random_state
+        # )
 
-        #model.fit(X_tr, y_tr)
-        cat_features = list(range(X_work.shape[1]))
-        model.fit(
-        X_tr, y_tr,
-        eval_set=(X_val, y_val),
-        cat_features=cat_features,
-        early_stopping_rounds=200,
-        use_best_model=True
-        )
-        auc = roc_auc_score(
-            y_val,
-            model.predict_proba(X_val)[:, 1]
-        )
+        # model.fit(X_tr, y_tr)
+        # # cat_features = list(range(X_work.shape[1]))
+        # # model.fit(
+        # # X_tr, y_tr,
+        # # eval_set=(X_val, y_val),
+        # # cat_features=cat_features,
+        # # early_stopping_rounds=200,
+        # # use_best_model=True
+        # # )
+        # auc = roc_auc_score(
+        #     y_val,
+        #     model.predict_proba(X_val)[:, 1]
+        # )
+
+        auc = cross_val_score(
+            model,
+            X_work, y,
+            cv=3,
+            scoring="roc_auc",
+            n_jobs=-1
+        ).mean()
 
         if auc > base_auc:
             base_auc = auc
@@ -213,6 +229,20 @@ y = y.map({"Presence": 1, "Absence": 0})
 
 # X["f6"] = (X["Thallium"] == 3) & (X["Age"] < 53.00)
 
+
+#X['f7'] = (X["Number of vessels fluro"] == np.int64(3)) & (X["Max HR"] > 103.75) & (X["Sex"] == 1) #→ AUC 0.95656                                                                       
+#X['f7'] = (X["Number of vessels fluro"] == np.int64(0)) & (X["ST depression"] > 1.86) & (X["Sex"] == 1)# → AUC 0.95657                                                                  
+#X['f7'] = (X["Slope of ST"] == np.int64(3)) & (X["ST depression"] < 0.62) & (X["Sex"] == 1) #→ AUC 0.95658                                                                              
+#X['f7'] = (X["Slope of ST"] == np.int64(3)) & (X["Cholesterol"] > 235.50) & (X["Exercise angina"] == 1)# → AUC 0.95660                                                                  
+#X['f7'] = (X["Number of vessels fluro"] == np.int64(0)) & (X["BP"] < 120.50) & (X["Sex"] == 1)# → AUC 0.95660                                                                           
+#X['f7'] = (X["Slope of ST"] == np.int64(2)) & (X["ST depression"] > 1.24) & (X["Sex"] == 1)# → AUC 0.95660                                                                              
+#X['f7'] = (X["Slope of ST"] == np.int64(3)) & (X["Age"] < 61.00) & (X["Sex"] == 1) #→ AUC 0.95663                                                                                       
+#X['f7'] = (X["Chest pain type"] == np.int64(2)) & (X["Age"] > 45.00) & (X["Sex"] == 1) #→ AUC 0.95663                                                                                   
+#X['f7'] = (X["Chest pain type"] == np.int64(1)) & (X["Age"] < 45.00) & (X["Exercise angina"] == 1) #→ AUC 0.95665  
+
+# for i in range(1,7):
+#     X[f"f{i}"] = X[f"f{i}"].astype(int)
+
 # X["f7"] = (X["Age"] > 68.00) & (X["Thallium"] == np.int64(7)) & (X["FBS over 120"] == 1)
 # X["f8"] = (X["Age"] > 65.00) & (X["Thallium"] == np.int64(7)) & (X["FBS over 120"] == 1)
 
@@ -223,7 +253,20 @@ y = y.map({"Presence": 1, "Absence": 0})
 # [KEEP] X['f1'] = (X["ST depression_disc"] == 'f_0_bin_4') & (X["Number of vessels fluro"] == np.int64(1)) → AUC 0.95483                                                                       
 # [KEEP] X['f1'] = (X["ST depression_disc"] == 'f_0_bin_2') & (X["Max HR_disc"] == 'f_3_bin_3') → AUC 0.95483                                                                                   
 # [KEEP] X['f1'] = (X["ST depression_disc"] == 'f_0_bin_3') & (X["Age_disc"] == 'f_1_bin_4') → AUC 0.95483                                                                                      
-# [KEEP] X['f1'] = (X["ST depression_disc"] == 'f_0_bin_3') & (X["Cholesterol_disc"] == 'f_2_bin_4') → AUC 0.95484   
+# [KEEP] X['f1'] = (X["ST depression_disc"] == 'f_0_bin_3') & (X["Cholesterol_disc"] == 'f_2_bin_4') → AUC 0.95484 
+# 
+# 
+
+# [KEEP] X['f1'] = (X["BP_disc"] == 'f_4_bin_2') & (X["Slope of ST"] == np.int64(2)) → AUC 0.95482                                                                                              
+# [KEEP] X['f1'] = (X["ST depression_disc"] == 'f_0_bin_3') & (X["Slope of ST"] == np.int64(2)) → AUC 0.95482                                                                                   
+# [KEEP] X['f1'] = (X["Max HR_disc"] == 'f_3_bin_2') & (X["Number of vessels fluro"] == np.int64(0)) → AUC 0.95483                                                                              
+# [KEEP] X['f1'] = (X["Age_disc"] == 'f_1_bin_1') & (X["Number of vessels fluro"] == np.int64(1)) → AUC 0.95483                                                                                 
+# [KEEP] X['f1'] = (X["BP_disc"] == 'f_4_bin_2') & (X["Thallium"] == np.int64(6)) → AUC 0.95483                                                                                                 
+# [KEEP] X['f1'] = (X["Age_disc"] == 'f_1_bin_1') & (X["Chest pain type"] == np.int64(3)) → AUC 0.95483                                                                                         
+# [KEEP] X['f1'] = (X["BP_disc"] == 'f_4_bin_0') & (X["Chest pain type"] == np.int64(2)) → AUC 0.95484                                                                                          
+# [KEEP] X['f1'] = (X["Thallium"] == np.int64(3)) & (X["Slope of ST"] == np.int64(2)) → AUC 0.95484    
+
+
 
 # X["f7"] =  (X["Exercise angina"] == 1) & (X["Sex"] == 1)
 # X["f8"] = (X["Exercise angina"] == 1) & (X["FBS over 120"] == 1)
@@ -250,7 +293,7 @@ categorical_cols = [
 ]
 
 binary_cols = [
-    "Exercise angina","Sex", "FBS over 120"
+    "Exercise angina","Sex", "FBS over 120" 
 ]
 
 #-------------------------------
@@ -273,13 +316,42 @@ for ix,col in enumerate(numeric_cols):
     labels = [f"f_{ix}_bin_{i}" for i in range(len(bins)-1)]
     X_disc[ col + "_disc"] = pd.cut(X[col], bins=bins, labels=labels)
 
-print(X_disc.head())
+#print(X_disc.head())
 
 X_total = pd.concat( [X_disc , X[categorical_cols]] , axis=1 )
 
 X_total = pd.concat( [X_total , X[binary_cols]] , axis=1 )
 
-print(X_total.head())
+# X_total['f1'] = (X_total["ST depression_disc"] == 'f_0_bin_4') & (X_total["EKG results"] == np.int64(0))
+# X_total['f2'] = (X_total["ST depression_disc"] == 'f_0_bin_4') & (X_total["Number of vessels fluro"] == np.int64(1))
+# X_total['f3'] = (X_total["ST depression_disc"] == 'f_0_bin_2') & (X_total["Max HR_disc"] == 'f_3_bin_3')
+# X_total['f4'] = (X_total["ST depression_disc"] == 'f_0_bin_3') & (X_total["Age_disc"] == 'f_1_bin_4')
+# X_total['f5'] = (X_total["ST depression_disc"] == 'f_0_bin_3') & (X_total["Cholesterol_disc"] == 'f_2_bin_4')
+
+#--------------------
+
+# [KEEP] X['f1'] = (X["Age_disc"] == 'f_1_bin_1') & (X["Number of vessels fluro"] == np.int64(1)) → AUC 0.95482                                                                                 
+# [KEEP] X['f1'] = (X["Max HR_disc"] == 'f_3_bin_0') & (X["FBS over 120"] == np.int64(0)) → AUC 0.95483                                                                                         
+# [KEEP] X['f1'] = (X["Max HR_disc"] == 'f_3_bin_2') & (X["Thallium"] == np.int64(6)) → AUC 0.95483                                                                                             
+# [KEEP] X['f1'] = (X["BP_disc"] == 'f_4_bin_1') & (X["EKG results"] == np.int64(0)) → AUC 0.95483                                                                                              
+# [KEEP] X['f1'] = (X["Chest pain type"] == np.int64(3)) & (X["Exercise angina"] == np.int64(0)) → AUC 0.95483                                                                                  
+# [KEEP] X['f1'] = (X["Cholesterol_disc"] == 'f_2_bin_0') & (X["Chest pain type"] == np.int64(1)) → AUC 0.95485                                                                                 
+# [KEEP] X['f1'] = (X["ST depression_disc"] == 'f_0_bin_4') & (X["Max HR_disc"] == 'f_3_bin_3') → AUC 0.95485                                                                                   
+# [KEEP] X['f1'] = (X["ST depression_disc"] == 'f_0_bin_1') & (X["Exercise angina"] == np.int64(0)) → AUC 0.95485                                                                               
+# [KEEP] X['f1'] = (X["Age_disc"] == 'f_1_bin_0') & (X["Slope of ST"] == np.int64(1)) → AUC 0.95485                                                                                             
+# [KEEP] X['f1'] = (X["Age_disc"] == 'f_1_bin_1') & (X["BP_disc"] == 'f_4_bin_2') → AUC 0.95485                                                                                                 
+# [KEEP] X['f1'] = (X["BP_disc"] == 'f_4_bin_0') & (X["Chest pain type"] == np.int64(2)) → AUC 0.95486                                                                                          
+# [KEEP] X['f1'] = (X["Max HR_disc"] == 'f_3_bin_3') & (X["EKG results"] == np.int64(0)) → AUC 0.95486                                                                                          
+# [KEEP] X['f1'] = (X["ST depression_disc"] == 'f_0_bin_1') & (X["Age_disc"] == 'f_1_bin_4') → AUC 0.95487                                                                                      
+# [KEEP] X['f1'] = (X["ST depression_disc"] == 'f_0_bin_4') & (X["Age_disc"] == 'f_1_bin_3') → AUC 0.95487                                                                                      
+# [KEEP] X['f1'] = (X["Number of vessels fluro"] == np.int64(2)) & (X["Exercise angina"] == np.int64(0)) → AUC 0.95487                                                                          
+# [KEEP] X['f1'] = (X["BP_disc"] == 'f_4_bin_4') & (X["Thallium"] == np.int64(3)) → AUC 0.95488                                                                                                 
+# [KEEP] X['f1'] = (X["EKG results"] == np.int64(1)) & (X["Sex"] == np.int64(0)) → AUC 0.95488                                                                                                  
+# [KEEP] X['f1'] = (X["Exercise angina"] == np.int64(0)) & (X["Sex"] == np.int64(0)) → AUC 0.95489                                                                                              
+# [KEEP] X['f1'] = (X["Age_disc"] == 'f_1_bin_1') & (X["FBS over 120"] == np.int64(1)) → AUC 0.95489                                                                                            
+# [KEEP] X['f1'] = (X["Max HR_disc"] == 'f_3_bin_2') & (X["Slope of ST"] == np.int64(2)) → AUC 0.95490      
+
+#print(X_total.head())
 
 #-------------------------------
 
@@ -296,44 +368,45 @@ print(X_total.head())
 #     "metric": "auc",
 # })
 
+print(X.head())
 
-# lgbm_params = {
-#     "objective": "binary",
-#     "metric": "auc",
-#     'n_estimators': 724,
-#     'max_depth': 2,
-#     'num_leaves': 153,
-#     'min_child_samples': 99,
-#     'learning_rate': 0.1387114580881059,
-#     'subsample': 0.37549286841241186,
-#     'colsample_bytree': 0.9077375200328026,
-#     'reg_alpha': 0.6578963730687483,
-#     'reg_lambda': 0.28960307157515247
-# }
-
-# model = LGBMClassifier(**lgbm_params, verbose=-1)
-
-cat_params =  {
-    "loss_function": "Logloss",
-    "eval_metric": "AUC",
-    "iterations": 3000,
-    "learning_rate": 0.05,
-    "depth": 5,
-    "l2_leaf_reg": 5,
-
-    "boosting_type": "Plain",
-    "one_hot_max_size": 10,
-    "max_ctr_complexity": 2,
-
-    "subsample": 0.8,
-    "rsm": 0.8,
-
-    "random_seed": 42,
-    "thread_count": -1,
-    "verbose": 0
+lgbm_params = {
+    "objective": "binary",
+    "metric": "auc",
+    'n_estimators': 724,
+    'max_depth': 2,
+    'num_leaves': 153,
+    'min_child_samples': 99,
+    'learning_rate': 0.1387114580881059,
+    'subsample': 0.37549286841241186,
+    'colsample_bytree': 0.9077375200328026,
+    'reg_alpha': 0.6578963730687483,
+    'reg_lambda': 0.28960307157515247
 }
 
-model = CatBoostClassifier(**cat_params)
+model = LGBMClassifier(**lgbm_params, verbose=-1)
+
+# cat_params =  {
+#     "loss_function": "Logloss",
+#     "eval_metric": "AUC",
+#     "iterations": 5000,
+#     "learning_rate": 0.03,
+#     "depth": 5,
+#     "l2_leaf_reg": 5,
+
+#     "boosting_type": "Plain",
+#     "one_hot_max_size": 10,
+#     "max_ctr_complexity": 2,
+
+#     "subsample": 0.8,
+#     "rsm": 0.8,
+
+#     "random_seed": 42,
+#     "thread_count": -1,
+#     "verbose": 0
+# }
+
+# model = CatBoostClassifier(**cat_params)
 
     # "Number of vessels fluro",
     # "ST depression",
@@ -341,11 +414,11 @@ model = CatBoostClassifier(**cat_params)
     # "Age", "BP", "Cholesterol",
     # "Max HR", 
 
-# selected_num_features = generate_gt_lt_num(
-#     X, ["Age"], [16]
-# )
+selected_num_features = generate_gt_lt_num(
+    X, ["Age" ,"ST depression","Number of vessels fluro" ], [16 ,31 , 3]
+)
 
-# selected_cat_features = generate_category_equality(X , ["EKG results"])
+selected_cat_features = generate_category_equality(X , [ "Thallium" , "EKG results" , "Chest pain type"])
 
     # "ST depression",
     # "Age", "BP", "Cholesterol",
@@ -355,9 +428,9 @@ model = CatBoostClassifier(**cat_params)
 #     X, numeric_cols, [10, 6, 4, 4, 4]
 # )
 
-cat_features = generate_category_equality(
-    X_total, X_total.columns.tolist()
-)
+# cat_features = generate_category_equality(
+#     X, categorical_cols
+# )
 
 base_booleans = {
     col: (
@@ -374,20 +447,20 @@ base_booleans = {
 
 #bool_bool = generate_cross_combinations_same(base_booleans)
 
-#selected_num_cat = generate_cross_combinations_different(selected_num_features,selected_cat_features)
+selected_num_cat = generate_cross_combinations_different(selected_num_features,selected_cat_features)
 
-#selected_num_cat_bool = generate_cross_combinations_different(selected_num_cat , base_booleans)
+selected_num_cat_bool = generate_cross_combinations_different(selected_num_cat , base_booleans)
 
 # num_cat = generate_cross_combinations_different(cat_features,num_features)
 # num_cat_bool = generate_cross_combinations_different(num_cat,base_booleans)
 
-cat_cat_features = generate_cross_combinations_same(cat_features)
+#cat_cat_features = generate_cross_combinations_same(cat_features)
 
 
-items = list(cat_cat_features.items())
-random.shuffle(items)
+# items = list(num_cat_bool.items())
+# random.shuffle(items)
 
-cat_cat_features_shuffled = dict(items)
+# num_cat_bool_shuffled = dict(items)
 
 # catcat_cat = generate_cross_combinations_different(cat_cat_features,cat_features)
 
@@ -422,9 +495,9 @@ cat_cat_features_shuffled = dict(items)
 
 
 accepted, X_final = greedy_auc_feature_addition(
-    X_total,
+    X,
     y,
-    cat_cat_features_shuffled,
+    selected_num_cat_bool,
     model
 )
 
@@ -439,8 +512,8 @@ for _, (_, expr) in accepted.items():
 
 hard_cleanup(
     #num_features,
-    cat_features,
-    cat_cat_features,
+    selected_num_cat_bool,
+    #num_cat_bool_shuffled,
 
     X_final
 )

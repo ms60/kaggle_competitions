@@ -28,17 +28,26 @@ print(X.head())
 # print(y.head())
 
 
-X["f1"] = (X["Age"] < 37.00) & (X["Thallium"] == 7) & (X["Sex"] == 1)
-X["f2"] = (X["Age"] < 37.00) & (X["Thallium"] == 7) & (X["Exercise angina"] == 1)
-X["f3"] = (X["Age"] > 69.00) & (X["Thallium"] == 7) & (X["Exercise angina"] == 1)
-X["f4"] = (X["Age"] > 69.00) & (X["Thallium"] == 7) & (X["FBS over 120"] == 1)
+# X["f1"] = (X["Age"] < 37.00) & (X["Thallium"] == 7) & (X["Sex"] == 1)
+# X["f2"] = (X["Age"] < 37.00) & (X["Thallium"] == 7) & (X["Exercise angina"] == 1)
+# X["f3"] = (X["Age"] > 69.00) & (X["Thallium"] == 7) & (X["Exercise angina"] == 1)
+# X["f4"] = (X["Age"] > 69.00) & (X["Thallium"] == 7) & (X["FBS over 120"] == 1)
 
-X["f5"] =   (X["Sex"] == 1) & (X["Chest pain type"] == 3) & (X["EKG results"] == 2)
+# X["f5"] =   (X["Sex"] == 1) & (X["Chest pain type"] == 3) & (X["EKG results"] == 2)
 
-X["f6"] = (X["Thallium"] == 3) & (X["Age"] < 53.00)
+# X["f6"] = (X["Thallium"] == 3) & (X["Age"] < 53.00)
 
-X["f7"] = (X["Age"] > 68.00) & (X["Thallium"] == 7) & (X["FBS over 120"] == 1)
-X["f8"] = (X["Age"] > 65.00) & (X["Thallium"] == 7) & (X["FBS over 120"] == 1)
+# X['f1'] = (X["Number of vessels fluro"] == np.int64(3)) & (X["Max HR"] > 103.75) & (X["Sex"] == 1) #→ AUC 0.95656                                                                       
+# X['f2'] = (X["Number of vessels fluro"] == np.int64(0)) & (X["ST depression"] > 1.86) & (X["Sex"] == 1)# → AUC 0.95657                                                                  
+# X['f3'] = (X["Slope of ST"] == np.int64(3)) & (X["ST depression"] < 0.62) & (X["Sex"] == 1) #→ AUC 0.95658                                                                              
+# X['f4'] = (X["Slope of ST"] == np.int64(3)) & (X["Cholesterol"] > 235.50) & (X["Exercise angina"] == 1)# → AUC 0.95660                                                                  
+# X['f5'] = (X["Number of vessels fluro"] == np.int64(0)) & (X["BP"] < 120.50) & (X["Sex"] == 1)# → AUC 0.95660                                                                           
+# X['f6'] = (X["Slope of ST"] == np.int64(2)) & (X["ST depression"] > 1.24) & (X["Sex"] == 1)# → AUC 0.95660                                                                              
+# X['f7'] = (X["Slope of ST"] == np.int64(3)) & (X["Age"] < 61.00) & (X["Sex"] == 1) #→ AUC 0.95663                                                                                       
+# X['f8'] = (X["Chest pain type"] == np.int64(2)) & (X["Age"] > 45.00) & (X["Sex"] == 1) #→ AUC 0.95663                                                                                   
+# X['f9'] = (X["Chest pain type"] == np.int64(1)) & (X["Age"] < 45.00) & (X["Exercise angina"] == 1) #→ AUC 0.95665  
+
+
 
 # X['Ischemia_Score'] = (X['ST depression'] * 3 +
 #                            X['Exercise angina'] * 2 +
@@ -81,17 +90,28 @@ X["f8"] = (X["Age"] > 65.00) & (X["Thallium"] == 7) & (X["FBS over 120"] == 1)
 
 ###
 
-test["f1"] = (test["Age"] < 37.00) & (test["Thallium"] == 7) & (test["Sex"] == 1)
-test["f2"] = (test["Age"] < 37.00) & (test["Thallium"] == 7) & (test["Exercise angina"] == 1)
-test["f3"] = (test["Age"] > 69.00) & (test["Thallium"] == 7) & (test["Exercise angina"] == 1)
-test["f4"] = (test["Age"] > 69.00) & (test["Thallium"] == 7) & (test["FBS over 120"] == 1)
+# test['f1'] = (test["Number of vessels fluro"] == np.int64(3)) & (test["Max HR"] > 103.75) & (test["Sex"] == 1) #→ AUC 0.95656                                                                       
+# test['f2'] = (test["Number of vessels fluro"] == np.int64(0)) & (test["ST depression"] > 1.86) & (test["Sex"] == 1)# → AUC 0.95657                                                                  
+# test['f3'] = (test["Slope of ST"] == np.int64(3)) & (test["ST depression"] < 0.62) & (test["Sex"] == 1) #→ AUC 0.95658                                                                              
+# test['f4'] = (test["Slope of ST"] == np.int64(3)) & (test["Cholesterol"] > 235.50) & (test["Exercise angina"] == 1)# → AUC 0.95660                                                                  
+# test['f5'] = (test["Number of vessels fluro"] == np.int64(0)) & (test["BP"] < 120.50) & (test["Sex"] == 1)# → AUC 0.95660                                                                           
+# test['f6'] = (test["Slope of ST"] == np.int64(2)) & (test["ST depression"] > 1.24) & (test["Sex"] == 1)# → AUC 0.95660                                                                              
+# test['f7'] = (test["Slope of ST"] == np.int64(3)) & (test["Age"] < 61.00) & (test["Sex"] == 1) #→ AUC 0.95663                                                                                       
+# test['f8'] = (test["Chest pain type"] == np.int64(2)) & (test["Age"] > 45.00) & (test["Sex"] == 1) #→ AUC 0.95663                                                                                   
+# test['f9'] = (test["Chest pain type"] == np.int64(1)) & (test["Age"] < 45.00) & (test["Exercise angina"] == 1) #→ AUC 0.95665  
 
-test["f5"] =   (test["Sex"] == 1) & (test["Chest pain type"] == 3) & (test["EKG results"] == 2)
 
-test["f6"] = (test["Thallium"] == 3) & (test["Age"] < 53.00)
+# test["f1"] = (test["Age"] < 37.00) & (test["Thallium"] == 7) & (test["Sex"] == 1)
+# test["f2"] = (test["Age"] < 37.00) & (test["Thallium"] == 7) & (test["Exercise angina"] == 1)
+# test["f3"] = (test["Age"] > 69.00) & (test["Thallium"] == 7) & (test["Exercise angina"] == 1)
+# test["f4"] = (test["Age"] > 69.00) & (test["Thallium"] == 7) & (test["FBS over 120"] == 1)
 
-test["f7"] = (test["Age"] > 68.00) & (test["Thallium"] == 7) & (test["FBS over 120"] == 1)
-test["f8"] = (test["Age"] > 65.00) & (test["Thallium"] == 7) & (test["FBS over 120"] == 1)
+# test["f5"] =   (test["Sex"] == 1) & (test["Chest pain type"] == 3) & (test["EKG results"] == 2)
+
+# test["f6"] = (test["Thallium"] == 3) & (test["Age"] < 53.00)
+
+# test["f7"] = (test["Age"] > 68.00) & (test["Thallium"] == 7) & (test["FBS over 120"] == 1)
+# test["f8"] = (test["Age"] > 65.00) & (test["Thallium"] == 7) & (test["FBS over 120"] == 1)
 
 # test['Ischemia_Score'] = (test['ST depression'] * 3 +
 #                            test['Exercise angina'] * 2 +
@@ -303,9 +323,16 @@ best_params_13={'n_estimators': 6405,'max_depth': 3,'boosting_type': 'gbdt', 'le
 
 
 best_params_8.update({
-    'n_estimators': 7000,
+    'n_estimators': 8000,
     "objective": "binary",
     "metric": "auc",
+    'verbose':-1
+})
+
+best_params_11.update({
+    "objective": "binary",
+    "metric": "auc",
+    'verbose':-1
 })
 
 best_params_14 =  {'num_leaves': 102, 'max_depth': 4, 'min_child_samples': 62, 'subsample': 0.6782669860878274, 'colsample_bytree': 0.3652259476700653}
@@ -341,7 +368,7 @@ best_params_15 =  {
 }
 
 
-best_model = LGBMClassifier(**best_params_15 )
+best_model = LGBMClassifier(**best_params_8 )
 
 
 # x_train_proc = preprocess.fit_transform(X_train)
@@ -369,7 +396,7 @@ result.to_csv("result.csv",index=False)
 
 
 
-cv = StratifiedKFold(n_splits=3, shuffle=True, random_state=42)
+cv = StratifiedKFold(n_splits=3, shuffle=True, random_state=60)
 scores = cross_val_score(
     best_model,
     X, y,
@@ -377,5 +404,6 @@ scores = cross_val_score(
     scoring="roc_auc",
     n_jobs=-1
 )
+print(scores)
 print(scores.mean())
 #0.9556102787583592
