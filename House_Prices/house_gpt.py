@@ -67,7 +67,7 @@ preprocessor = ColumnTransformer([
 # ---------------------
 
 X_train_split, X_valid, y_train_split, y_valid = train_test_split(
-    train, y, test_size=0.2, random_state=42
+    X, y, test_size=0.2, random_state=42
 )
 
 X_train_split_proc = preprocessor.fit_transform(X_train_split)
