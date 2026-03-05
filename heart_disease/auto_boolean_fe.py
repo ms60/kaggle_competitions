@@ -8,8 +8,9 @@ from lightgbm import LGBMClassifier
 import numpy as np
 import pandas as pd
 from itertools import combinations, product
+from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import roc_auc_score
-from sklearn.model_selection import cross_val_score, train_test_split
+from sklearn.model_selection import StratifiedKFold, cross_val_score, train_test_split
 from tqdm import tqdm
 
 import resource
@@ -28,7 +29,7 @@ def hard_cleanup(*objs):
     gc.collect()
 
 
-
+skf = StratifiedKFold(n_splits=3, shuffle=True, random_state=60)
 
 # =====================================================
 # FEATURE GENERATORS (WITH EXPRESSIONS)
@@ -125,29 +126,19 @@ def greedy_auc_feature_addition(
     # )
 
     # model.fit(X_tr, y_tr)
-    # # for col in X.columns:
-    # #     X[col] = X[col].astype(str)
 
-    # # cat_features = list(range(X.shape[1]))
-    # # model.fit(
-    # #     X_tr, y_tr,
-    # #     eval_set=(X_val, y_val),
-    # #     cat_features=cat_features,
-    # #     early_stopping_rounds=200,
-    # #     use_best_model=True
-    # # )
     # base_auc = roc_auc_score(
     #     y_val,
     #     model.predict_proba(X_val)[:, 1]
     # )
-
+    
     base_auc = cross_val_score(
         model,
         X_work, y,
-        cv=3,
+        cv=skf,
         scoring="roc_auc",
         n_jobs=-1
-    ).mean()
+    ).min()
 
     print(f"Initial AUC: {base_auc:.5f}")
 
@@ -169,14 +160,7 @@ def greedy_auc_feature_addition(
         # )
 
         # model.fit(X_tr, y_tr)
-        # # cat_features = list(range(X_work.shape[1]))
-        # # model.fit(
-        # # X_tr, y_tr,
-        # # eval_set=(X_val, y_val),
-        # # cat_features=cat_features,
-        # # early_stopping_rounds=200,
-        # # use_best_model=True
-        # # )
+
         # auc = roc_auc_score(
         #     y_val,
         #     model.predict_proba(X_val)[:, 1]
@@ -185,10 +169,10 @@ def greedy_auc_feature_addition(
         auc = cross_val_score(
             model,
             X_work, y,
-            cv=3,
+            cv=skf,
             scoring="roc_auc",
             n_jobs=-1
-        ).mean()
+        ).min()
 
         if auc > base_auc:
             base_auc = auc
@@ -213,6 +197,44 @@ test = pd.read_csv("./data/test.csv")
 X = train.drop("id", axis=1)
 y = X.pop("Heart Disease")
 y = y.map({"Presence": 1, "Absence": 0})
+
+X['f1'] = (X["Age"] < 32.00) & (X["Thallium"] == np.int64(7)) & (X["Exercise angina"] == 1) #→ AUC 0.95459                                                                           
+X['f2'] = (X["Age"] > 68.00) & (X["Thallium"] == np.int64(3)) & (X["Exercise angina"] == 1) #→ AUC 0.95460                                                                           
+X['f3'] = (X["Age"] > 68.00) & (X["Chest pain type"] == np.int64(2)) & (X["Sex"] == 1) #→ AUC 0.95461                                                                                
+X['f4'] = (X["Age"] < 53.00) & (X["EKG results"] == np.int64(0)) & (X["Sex"] == 1) #→ AUC 0.95461                                                                                    
+X['f5'] = (X["Age"] < 56.00) & (X["EKG results"] == np.int64(2)) & (X["Sex"] == 1) #→ AUC 0.95462                                                                                    
+X['f6'] = (X["Age"] < 59.00) & (X["Thallium"] == np.int64(7)) & (X["Sex"] == 1) #→ AUC 0.95462                                                                                       
+X['f7'] = (X["Age"] > 47.00) & (X["Thallium"] == np.int64(3)) & (X["Sex"] == 1) #→ AUC 0.95464  
+
+X['f8'] = (X["Age"] < 32.00) & (X["Thallium"] == np.int64(7)) & (X["Exercise angina"] == 1) #→ AUC 0.95459     
+X['f9'] = (X["Age"] < 32.00) & (X["Thallium"] == np.int64(7)) & (X["Exercise angina"] == 1) #→ AUC 0.95459  
+X['f10'] = (X["Age"] < 32.00) & (X["Thallium"] == np.int64(7)) & (X["Exercise angina"] == 1) #→ AUC 0.95459
+
+X['f11'] = (X["BP"] < 104.60) & (X["Slope of ST"] == np.int64(2))# → AUC 0.94979                                                                                                      
+X['f12'] = (X["BP"] < 104.60) & (X["Slope of ST"] == np.int64(1))# → AUC 0.95332 
+
+                                                                                                    
+X['f13'] = (X["BP"] < 104.60) & (X["Slope of ST"] == np.int64(1))# → AUC 0.95332 
+
+X['f14'] = (X["Slope of ST"] == np.int64(2)) & (X["Thallium"] == np.int64(7))# → AUC 0.95303                                                                                          
+X['f15'] = (X["Slope of ST"] == np.int64(2)) & (X["Thallium"] == np.int64(3))# → AUC 0.95310   
+
+X['f16'] = (X["Slope of ST"] == np.int64(2)) & (X["Thallium"] == np.int64(7))
+
+X['f17'] = (X["Number of vessels fluro"] == np.int64(2)) & (X["EKG results"] == np.int64(0))
+
+X['f18'] = (X["Exercise angina"] == 1) & (X["Number of vessels fluro"] == np.int64(2)) & (X["EKG results"] == np.int64(0))# → AUC 0.95500 
+X['f19'] = (X["Exercise angina"] == 1) & (X["Number of vessels fluro"] == np.int64(2)) & (X["EKG results"] == np.int64(2))# → AUC 0.95505
+
+X['f20'] = (X["Exercise angina"] == 1) & (X["Number of vessels fluro"] == np.int64(2)) & (X["Thallium"] == np.int64(3))# → AUC 0.95505                                                
+X['f21'] = (X["Exercise angina"] == 1) & (X["Number of vessels fluro"] == np.int64(2)) & (X["Thallium"] == np.int64(6))# → AUC 0.95506 
+X['f22'] = (X["Exercise angina"] == 1) & (X["Number of vessels fluro"] == np.int64(0)) & (X["Chest pain type"] == np.int64(3))# → AUC 0.95507
+
+X['f23'] = (X["Sex"] == 1) & (X["Number of vessels fluro"] == np.int64(2)) & (X["Chest pain type"] == np.int64(4))# → AUC 0.95506
+
+X['f24'] = (X["Sex"] == 1) & (X["Number of vessels fluro"] == np.int64(2)) & (X["EKG results"] == np.int64(0))# → AUC 0.95502
+
+X['f25'] = (X["Sex"] == 1) & (X["Number of vessels fluro"] == np.int64(2)) & (X["Chest pain type"] == np.int64(3))# → AUC 0.95473
 
 # X["f1"] = (X["Age"] < 32.00) & (X["Thallium"] == np.int64(3)) & (X["Sex"] == 1)
 # X["f2"] = (X["Age"] > 74.00) & (X["Thallium"] == np.int64(3)) & (X["Sex"] == 1)
@@ -293,7 +315,7 @@ categorical_cols = [
 ]
 
 binary_cols = [
-    "Exercise angina","Sex", "FBS over 120" 
+    "Sex", "FBS over 120" , "Exercise angina" 
 ]
 
 #-------------------------------
@@ -356,35 +378,63 @@ X_total = pd.concat( [X_total , X[binary_cols]] , axis=1 )
 #-------------------------------
 
 
+
+
+#---------------------------------
+
+
 #lgbm_params = {'boosting_type': 'gbdt', 'n_estimators': 6405, 'learning_rate': 0.030752124591604243, 'num_leaves': 75, 'max_depth': 3, 'min_child_samples': 178, 'subsample': 0.620293411878579, 'colsample_bytree': 0.13455421264459272, 'reg_alpha': 3.924444416649399, 'reg_lambda': 0.26152458198337813}
 #lgbm_params = {'boosting_type': 'gbdt', 'learning_rate': 0.10139689417192685, 'num_leaves': 105, 'min_child_samples': 150, 'min_child_weight': 1.4859133739671821, 'min_split_gain': 0.015630473429093072, 'subsample': 0.22242548213805655, 'colsample_bytree': 0.12177938947172448, 'reg_alpha': 1.341517183219574, 'reg_lambda': 0.008658382822838841}
 #lgbm_params = {'boosting_type': 'gbdt', 'n_estimators': 6405, 'learning_rate': 0.030752124591604243, 'num_leaves': 75, 'max_depth': 3, 'min_child_samples': 178, 'subsample': 0.620293411878579, 'colsample_bytree': 0.13455421264459272, 'reg_alpha': 3.924444416649399, 'reg_lambda': 0.26152458198337813}
 #lgbm_params = {'boosting_type': 'gbdt', 'n_estimators': 7500, 'learning_rate': 0.030752124591604243, 'num_leaves': 75, 'max_depth': 3, 'min_child_samples': 178, 'subsample': 0.620293411878579, 'colsample_bytree': 0.13455421264459272, 'reg_alpha': 3.924444416649399, 'reg_lambda': 0.26152458198337813}
 #{'boosting_type': 'gbdt', 'n_estimators': 1236, 'learning_rate': 0.15163077379677498, 'num_leaves': 97, 'max_depth': 3, 'min_child_samples': 23, 'subsample': 0.8203405205601193, 'colsample_bytree': 0.15103910849091867, 'reg_alpha': 1.8094159069409557, 'reg_lambda': 0.8206319983321384}
 
-# lgbm_params = {'boosting_type': 'gbdt', 'n_estimators': 6405, 'learning_rate': 0.030752124591604243, 'num_leaves': 75, 'max_depth': 3, 'min_child_samples': 178, 'subsample': 0.620293411878579, 'colsample_bytree': 0.13455421264459272, 'reg_alpha': 3.924444416649399, 'reg_lambda': 0.26152458198337813}
-# lgbm_params.update({
-#     "objective": "binary",
-#     "metric": "auc",
-# })
+
+lgbm_params ={'n_estimators': 724, 'max_depth': 2, 'num_leaves': 153, 'min_child_samples': 99, 'learning_rate': 0.1387114580881059, 'subsample': 0.37549286841241186, 'colsample_bytree': 0.9077375200328026, 'reg_alpha': 0.6578963730687483, 'reg_lambda': 0.28960307157515247}
+#lgbm_params = {'boosting_type': 'gbdt', 'n_estimators': 6405, 'learning_rate': 0.030752124591604243, 'num_leaves': 75, 'max_depth': 3, 'min_child_samples': 178, 'subsample': 0.620293411878579, 'colsample_bytree': 0.13455421264459272, 'reg_alpha': 3.924444416649399, 'reg_lambda': 0.26152458198337813}
+#Initial AUC: 0.95545 with cv
+# 0.95657
+#lgbm_params = {'boosting_type': 'gbdt', 'n_estimators': 8037, 'learning_rate': 0.01961744449399505, 'num_leaves': 254, 'max_depth': 5, 'min_child_samples': 14, 'min_child_weight': 0.6303846127454082, 'min_split_gain': 0.18764237497463476, 'subsample': 0.26167571300890513, 'colsample_bytree': 0.17491054511557924, 'reg_alpha': 0.007670436055874847, 'reg_lambda': 0.9952489654312465}
+
+#lgbm_params = {'boosting_type': 'gbdt', 'n_estimators': 7730, 'learning_rate': 0.028778047251309946, 'num_leaves': 96, 'max_depth': 3, 'min_child_samples': 13, 'min_child_weight': 0.2316553378161039, 'min_split_gain': 0.042823710761769954, 'subsample': 0.36699422027167905, 'colsample_bytree': 0.12199531962565616, 'reg_alpha': 0.5624471773258042, 'reg_lambda': 2.9747133675697754}
+lgbm_params.update({
+    'boosting_type': 'gbdt',
+    'n_estimators': 1992,
+    # 'min_child_weight': 0.0023487410631235703,
+    # 'min_split_gain': 0.004094962237309152,
+    'min_child_weight': 0.2045358944188131, 'min_split_gain': 0.0008287110542991236,
+    "random_state":110,
+    "objective": "binary",
+    "metric": "auc",
+})
+
 
 print(X.head())
 
-lgbm_params = {
-    "objective": "binary",
-    "metric": "auc",
-    'n_estimators': 724,
-    'max_depth': 2,
-    'num_leaves': 153,
-    'min_child_samples': 99,
-    'learning_rate': 0.1387114580881059,
-    'subsample': 0.37549286841241186,
-    'colsample_bytree': 0.9077375200328026,
-    'reg_alpha': 0.6578963730687483,
-    'reg_lambda': 0.28960307157515247
-}
+# lgbm_params = {
+#     "objective": "binary",
+#     "metric": "auc",
+#     'n_estimators': 724,
+#     'max_depth': 2,
+#     'num_leaves': 153,
+#     'min_child_samples': 99,
+#     'learning_rate': 0.1387114580881059,
+#     'subsample': 0.37549286841241186,
+#     'colsample_bytree': 0.9077375200328026,
+#     'reg_alpha': 0.6578963730687483,
+#     'reg_lambda': 0.28960307157515247
+# }
 
 model = LGBMClassifier(**lgbm_params, verbose=-1)
+
+# model = LogisticRegression(
+#     penalty="elasticnet",
+#     C=1.0,
+#     l1_ratio=0.5,       # 0 → Ridge, 1 → Lasso
+#     solver="saga",      # şart
+#     max_iter=1000,
+#     n_jobs=-1
+# )
 
 # cat_params =  {
 #     "loss_function": "Logloss",
@@ -416,9 +466,26 @@ model = LGBMClassifier(**lgbm_params, verbose=-1)
 
 selected_num_features = generate_gt_lt_num(
     X, ["Age" ,"ST depression","Number of vessels fluro" ], [16 ,31 , 3]
+    #X , ["Cholesterol","BP","Max HR",] , [10 , 10 , 10]
 )
 
-selected_cat_features = generate_category_equality(X , [ "Thallium" , "EKG results" , "Chest pain type"])
+categorical_cols = [
+    "EKG results","Thallium", "Chest pain type","Slope of ST","Number of vessels fluro"
+]
+
+
+
+selected_cat_features = generate_category_equality(
+    #X , [ "Thallium" , "EKG results" , "Chest pain type"]
+    X , [ "Number of vessels fluro" , "Slope of ST"]
+    #X , ["Number of vessels fluro" , "Slope of ST" ]
+    )
+
+selected_cat_features_2 = generate_category_equality(
+    #X , [ "Thallium" , "EKG results" , "Chest pain type"]
+    #X , [ "Slope of ST","Number of vessels fluro"]
+    X , [ "EKG results" , "Chest pain type" , "Thallium"  ]
+    )
 
     # "ST depression",
     # "Age", "BP", "Cholesterol",
@@ -447,9 +514,19 @@ base_booleans = {
 
 #bool_bool = generate_cross_combinations_same(base_booleans)
 
+selected_num_num = generate_cross_combinations_same(selected_num_features)
+
+
+
 selected_num_cat = generate_cross_combinations_different(selected_num_features,selected_cat_features)
 
 selected_num_cat_bool = generate_cross_combinations_different(selected_num_cat , base_booleans)
+
+selected_cat_cat = generate_cross_combinations_different(selected_cat_features,selected_cat_features_2)
+
+selected_cat_cat_bool = generate_cross_combinations_different(base_booleans , selected_cat_cat  )
+
+
 
 # num_cat = generate_cross_combinations_different(cat_features,num_features)
 # num_cat_bool = generate_cross_combinations_different(num_cat,base_booleans)
@@ -493,10 +570,19 @@ selected_num_cat_bool = generate_cross_combinations_different(selected_num_cat ,
 
 #X.pop("Max HR")
 
-
-accepted, X_final = greedy_auc_feature_addition(
+X_small, _, y_small, _ = train_test_split(
     X,
     y,
+    train_size=120_000,
+    stratify=y,
+    shuffle=True,
+    random_state=42
+)
+
+
+accepted, X_final = greedy_auc_feature_addition(
+    X_small,
+    y_small,
     selected_num_cat_bool,
     model
 )

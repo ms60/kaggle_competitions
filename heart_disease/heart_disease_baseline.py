@@ -12,7 +12,8 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline, make_pipeline
 
 from sklearn.metrics import mean_absolute_error, r2_score , accuracy_score , classification_report ,  precision_score, recall_score, f1_score, roc_auc_score, average_precision_score
-from sklearn.preprocessing import OneHotEncoder,OrdinalEncoder , StandardScaler 
+from sklearn.preprocessing import OneHotEncoder,OrdinalEncoder , StandardScaler
+from xgboost import XGBClassifier 
 
 
 
@@ -23,8 +24,85 @@ X = train.drop("id",axis = 1)
 y = X.pop("Heart Disease")
 y = y.map({"Presence":1 , "Absence":0})
 
-oof_X = pd.read_csv("./data/oof_train.csv" )
-print(X.head())
+X['f1'] = (X["Age"] < 32.00) & (X["Thallium"] == np.int64(7)) & (X["Exercise angina"] == 1) #→ AUC 0.95459                                                                           
+X['f2'] = (X["Age"] > 68.00) & (X["Thallium"] == np.int64(3)) & (X["Exercise angina"] == 1) #→ AUC 0.95460                                                                           
+X['f3'] = (X["Age"] > 68.00) & (X["Chest pain type"] == np.int64(2)) & (X["Sex"] == 1) #→ AUC 0.95461                                                                                
+X['f4'] = (X["Age"] < 53.00) & (X["EKG results"] == np.int64(0)) & (X["Sex"] == 1) #→ AUC 0.95461                                                                                    
+X['f5'] = (X["Age"] < 56.00) & (X["EKG results"] == np.int64(2)) & (X["Sex"] == 1) #→ AUC 0.95462                                                                                    
+X['f6'] = (X["Age"] < 59.00) & (X["Thallium"] == np.int64(7)) & (X["Sex"] == 1) #→ AUC 0.95462                                                                                       
+X['f7'] = (X["Age"] > 47.00) & (X["Thallium"] == np.int64(3)) & (X["Sex"] == 1) #→ AUC 0.95464  
+
+X['f8'] = (X["Age"] < 32.00) & (X["Thallium"] == np.int64(7)) & (X["Exercise angina"] == 1) #→ AUC 0.95459     
+X['f9'] = (X["Age"] < 32.00) & (X["Thallium"] == np.int64(7)) & (X["Exercise angina"] == 1) #→ AUC 0.95459  
+X['f10'] = (X["Age"] < 32.00) & (X["Thallium"] == np.int64(7)) & (X["Exercise angina"] == 1) #→ AUC 0.95459
+
+X['f11'] = (X["BP"] < 104.60) & (X["Slope of ST"] == np.int64(2))# → AUC 0.94979                                                                                                      
+X['f12'] = (X["BP"] < 104.60) & (X["Slope of ST"] == np.int64(1))# → AUC 0.95332 
+
+                                                                                                    
+X['f13'] = (X["BP"] < 104.60) & (X["Slope of ST"] == np.int64(1))# → AUC 0.95332 
+
+X['f14'] = (X["Slope of ST"] == np.int64(2)) & (X["Thallium"] == np.int64(7))# → AUC 0.95303                                                                                          
+X['f15'] = (X["Slope of ST"] == np.int64(2)) & (X["Thallium"] == np.int64(3))# → AUC 0.95310   
+
+X['f16'] = (X["Slope of ST"] == np.int64(2)) & (X["Thallium"] == np.int64(7))
+
+X['f17'] = (X["Number of vessels fluro"] == np.int64(2)) & (X["EKG results"] == np.int64(0))
+
+X['f18'] = (X["Exercise angina"] == 1) & (X["Number of vessels fluro"] == np.int64(2)) & (X["EKG results"] == np.int64(0))# → AUC 0.95500 
+X['f19'] = (X["Exercise angina"] == 1) & (X["Number of vessels fluro"] == np.int64(2)) & (X["EKG results"] == np.int64(2))# → AUC 0.95505
+
+X['f20'] = (X["Exercise angina"] == 1) & (X["Number of vessels fluro"] == np.int64(2)) & (X["Thallium"] == np.int64(3))# → AUC 0.95505                                                
+X['f21'] = (X["Exercise angina"] == 1) & (X["Number of vessels fluro"] == np.int64(2)) & (X["Thallium"] == np.int64(6))# → AUC 0.95506 
+X['f22'] = (X["Exercise angina"] == 1) & (X["Number of vessels fluro"] == np.int64(0)) & (X["Chest pain type"] == np.int64(3))# → AUC 0.95507
+
+X['f23'] = (X["Sex"] == 1) & (X["Number of vessels fluro"] == np.int64(2)) & (X["Chest pain type"] == np.int64(4))# → AUC 0.95506    
+
+X['f24'] = (X["Sex"] == 1) & (X["Number of vessels fluro"] == np.int64(2)) & (X["EKG results"] == np.int64(0))# → AUC 0.95502
+
+X['f25'] = (X["Sex"] == 1) & (X["Number of vessels fluro"] == np.int64(2)) & (X["Chest pain type"] == np.int64(3))# → AUC 0.95473
+
+
+test['f1'] = (test["Age"] < 32.00) & (test["Thallium"] == np.int64(7)) & (test["Exercise angina"] == 1) #→ AUC 0.95459                                                                           
+test['f2'] = (test["Age"] > 68.00) & (test["Thallium"] == np.int64(3)) & (test["Exercise angina"] == 1) #→ AUC 0.95460                                                                           
+test['f3'] = (test["Age"] > 68.00) & (test["Chest pain type"] == np.int64(2)) & (test["Sex"] == 1) #→ AUC 0.95461                                                                                
+test['f4'] = (test["Age"] < 53.00) & (test["EKG results"] == np.int64(0)) & (test["Sex"] == 1) #→ AUC 0.95461                                                                                    
+test['f5'] = (test["Age"] < 56.00) & (test["EKG results"] == np.int64(2)) & (test["Sex"] == 1) #→ AUC 0.95462                                                                                    
+test['f6'] = (test["Age"] < 59.00) & (test["Thallium"] == np.int64(7)) & (test["Sex"] == 1) #→ AUC 0.95462                                                                                       
+test['f7'] = (test["Age"] > 47.00) & (test["Thallium"] == np.int64(3)) & (test["Sex"] == 1) #→ AUC 0.95464  
+
+test['f8'] = (test["Age"] < 32.00) & (test["Thallium"] == np.int64(7)) & (test["Exercise angina"] == 1) #→ AUC 0.95459     
+test['f9'] = (test["Age"] < 32.00) & (test["Thallium"] == np.int64(7)) & (test["Exercise angina"] == 1) #→ AUC 0.95459  
+test['f10'] = (test["Age"] < 32.00) & (test["Thallium"] == np.int64(7)) & (test["Exercise angina"] == 1) #→ AUC 0.95459
+
+test['f11'] = (test["BP"] < 104.60) & (test["Slope of ST"] == np.int64(2))# → AUC 0.94979                                                                                                      
+test['f12'] = (test["BP"] < 104.60) & (test["Slope of ST"] == np.int64(1))# → AUC 0.95332 
+
+                                                                                                    
+test['f13'] = (test["BP"] < 104.60) & (test["Slope of ST"] == np.int64(1))# → AUC 0.95332 
+
+test['f14'] = (test["Slope of ST"] == np.int64(2)) & (test["Thallium"] == np.int64(7))# → AUC 0.95303                                                                                          
+test['f15'] = (test["Slope of ST"] == np.int64(2)) & (test["Thallium"] == np.int64(3))# → AUC 0.95310   
+
+test['f16'] = (test["Slope of ST"] == np.int64(2)) & (test["Thallium"] == np.int64(7))
+
+test['f17'] = (test["Number of vessels fluro"] == np.int64(2)) & (test["EKG results"] == np.int64(0))
+
+test['f18'] = (test["Exercise angina"] == 1) & (test["Number of vessels fluro"] == np.int64(2)) & (test["EKG results"] == np.int64(0))# → AUC 0.95500 
+test['f19'] = (test["Exercise angina"] == 1) & (test["Number of vessels fluro"] == np.int64(2)) & (test["EKG results"] == np.int64(2))# → AUC 0.95505
+
+test['f20'] = (test["Exercise angina"] == 1) & (test["Number of vessels fluro"] == np.int64(2)) & (test["Thallium"] == np.int64(3))# → AUC 0.95505                                                
+test['f21'] = (test["Exercise angina"] == 1) & (test["Number of vessels fluro"] == np.int64(2)) & (test["Thallium"] == np.int64(6))# → AUC 0.95506 
+test['f22'] = (test["Exercise angina"] == 1) & (test["Number of vessels fluro"] == np.int64(0)) & (test["Chest pain type"] == np.int64(3))# → AUC 0.95507
+
+test['f23'] = (test["Sex"] == 1) & (test["Number of vessels fluro"] == np.int64(2)) & (test["Chest pain type"] == np.int64(4))# → AUC 0.95506
+
+test['f24'] = (test["Sex"] == 1) & (test["Number of vessels fluro"] == np.int64(2)) & (test["EKG results"] == np.int64(0))# → AUC 0.95502
+
+test['f25'] = (test["Sex"] == 1) & (test["Number of vessels fluro"] == np.int64(2)) & (test["Chest pain type"] == np.int64(3))# → AUC 0.95473
+
+# oof_X = pd.read_csv("./data/oof_train.csv" )
+# print(X.head())
 # print(y.head())
 
 
@@ -193,8 +271,17 @@ preprocess = make_column_transformer(
     remainder="passthrough"
 )
 
+# X_small, _, y_small, _ = train_test_split(
+#     X,
+#     y,
+#     train_size=120_000,
+#     stratify=y,
+#     shuffle=True,
+#     random_state=42
+# )
 
-X_train , X_valid , y_train , y_valid = train_test_split(X,y,test_size=0.075, shuffle=True ,stratify=y)
+
+X_train , X_valid , y_train , y_valid = train_test_split(X,y,test_size=0.1, shuffle=True ,stratify=y)
 
 
 # model = LGBMClassifier()
@@ -248,42 +335,76 @@ X_train , X_valid , y_train , y_valid = train_test_split(X,y,test_size=0.075, sh
     # 'reg_alpha': 0.6578963730687483,
     # 'reg_lambda': 0.28960307157515247
 
-def objective(trial):
+skf = StratifiedKFold(n_splits=3, shuffle=True, random_state=60)
 
-    params= {
-    "boosting_type": trial.suggest_categorical("boosting_type", ["gbdt"]),
+def objective(trial):
+    #2
+    #params = {'boosting_type':'gbdt','n_estimators': 1992, 'max_depth': 2, 'num_leaves': 153, 'min_child_samples': 99, 'learning_rate': 0.1387114580881059, 'subsample': 0.37549286841241186, 'colsample_bytree': 0.9077375200328026, 'reg_alpha': 0.6578963730687483, 'reg_lambda': 0.28960307157515247}
+
+    #8
+    params = {'boosting_type': 'gbdt', 'n_estimators': 6405, 'learning_rate': 0.030752124591604243, 'num_leaves': 75, 'max_depth': 3, 'min_child_samples': 178, 'subsample': 0.620293411878579, 'colsample_bytree': 0.13455421264459272, 'reg_alpha': 3.924444416649399, 'reg_lambda': 0.26152458198337813}
+
+    params.update({
+
     "objective": "binary",
     "metric": "auc",
-    "n_estimators": trial.suggest_int("n_estimators", 5000, 7000) ,#6405,#trial.suggest_int("n_estimators", 100, 7000),
-    "learning_rate": trial.suggest_float("learning_rate", 0.005, 0.5,log=True),
-    "num_leaves": trial.suggest_int("num_leaves", 10, 256),
-    "max_depth": trial.suggest_int("max_depth", 3, 5),#,3,#trial.suggest_int("max_depth", 3, 8),
-    "min_child_samples": trial.suggest_int("min_child_samples", 10, 300,log=True),
-    "min_child_weight": trial.suggest_float("min_child_weight", 1e-3, 10.0, log=True),
-    "min_split_gain": trial.suggest_float("min_split_gain", 0.0, 1.0),
-    "subsample": trial.suggest_float("subsample", 0.1, 1.0),
-    #"subsample_freq": trial.suggest_int("subsample_freq", 1, 10),
-    "colsample_bytree": trial.suggest_float("colsample_bytree", 0.1, 1.0 , log=True),
-    "reg_alpha": trial.suggest_float("reg_alpha", 1e-3, 5.0,log=True),
-    "reg_lambda": trial.suggest_float("reg_lambda", 1e-3, 5.0,log=True),
-    #"max_bin": trial.suggest_int("max_bin", 64, 512),
-    "random_state": 42,
-    "verbosity": -1,
-    }
+    #'min_child_weight': 0.0023487410631235703,
+    #'min_split_gain': 0.004094962237309152,
+    #'min_child_weight': 0.2045358944188131, 'min_split_gain': 0.0008287110542991236,
 
-    # x_train_proc = preprocess.fit_transform(X_train)
-    # X_valid_proc = preprocess.transform(X_valid)
+    #"min_child_weight": trial.suggest_float("min_child_weight", 1e-3, 10.0, log=True),
+    #"min_split_gain": trial.suggest_float("min_split_gain", 0.0, 1.0),
+    #"max_bin": trial.suggest_int("max_bin", 254, 256),
+    "random_state":  trial.suggest_int("random_state", 1, 1000), #42,
+    "verbosity": -1,
+
+    })
+
+    # params= {
+
+
+
+
+    # # "boosting_type": trial.suggest_categorical("boosting_type", ["gbdt"]),
+    # # "objective": "binary",
+    # # "metric": "auc",
+    # # "n_estimators": trial.suggest_int("n_estimators", 100, 10000) ,#6405,#trial.suggest_int("n_estimators", 100, 7000),
+    # # "learning_rate": trial.suggest_float("learning_rate", 0.005, 0.5,log=True),
+    # # "num_leaves": trial.suggest_int("num_leaves", 10, 256),
+    # # "max_depth": trial.suggest_int("max_depth", 3, 5),#,3,#trial.suggest_int("max_depth", 3, 8),
+    # # "min_child_samples": trial.suggest_int("min_child_samples", 10, 300,log=True),
+    # # "min_child_weight": trial.suggest_float("min_child_weight", 1e-3, 10.0, log=True),
+    # # "min_split_gain": trial.suggest_float("min_split_gain", 0.0, 1.0),
+    # # "subsample": trial.suggest_float("subsample", 0.1, 1.0),
+    # # #"subsample_freq": trial.suggest_int("subsample_freq", 1, 10),
+    # # "colsample_bytree": trial.suggest_float("colsample_bytree", 0.1, 1.0 , log=True),
+    # # "reg_alpha": trial.suggest_float("reg_alpha", 1e-3, 5.0,log=True),
+    # # "reg_lambda": trial.suggest_float("reg_lambda", 1e-3, 5.0,log=True),
+    # # #"max_bin": trial.suggest_int("max_bin", 64, 512),
+    # "random_state": 42,
+    # "verbosity": -1,
+    # }
+
+
 
     model = LGBMClassifier(**params)
-    model.fit(X_train,y_train)
+    #model.fit(X_train,y_train)
 
-    #y_preds = model.predict(X_valid_proc)
-    y_proba = model.predict_proba(X_valid)[:, 1]
+    # #y_preds = model.predict(X_valid_proc)
+    # y_proba = model.predict_proba(X_valid)[:, 1]
 
-    score = roc_auc_score(y_valid, y_proba)
+    # score = roc_auc_score(y_valid, y_proba)
+
+    scores = cross_val_score(
+        model,
+        X, y,
+        cv=skf,
+        scoring="roc_auc",
+        n_jobs=-1
+    )
     
     
-    return score
+    return scores.mean()
 
 # study = optuna.create_study(direction='maximize')
 # study.optimize(objective, n_trials=150)
@@ -323,13 +444,28 @@ best_params_13={'n_estimators': 6405,'max_depth': 3,'boosting_type': 'gbdt', 'le
 
 
 best_params_8.update({
-    'n_estimators': 8000,
+    'n_estimators': 12000,
     "objective": "binary",
     "metric": "auc",
     'verbose':-1
 })
 
-best_params_11.update({
+#{'boosting_type': 'gbdt', 'n_estimators': 7252, 'min_child_weight': 0.0013828314497941732, 'min_split_gain': 0.012790547645292891}
+#{'boosting_type': 'gbdt', 'n_estimators': 5729, 'min_child_weight': 0.001420000074123888, 'min_split_gain': 0.03401605410351187}
+
+best_params_2.update({
+    'boosting_type': 'gbdt',
+    'n_estimators': 1992,
+    # 'min_child_weight': 0.0023487410631235703,
+    # 'min_split_gain': 0.004094962237309152,
+    'min_child_weight': 0.2045358944188131, 'min_split_gain': 0.0008287110542991236,
+    "random_state":110,
+    "objective": "binary",
+    "metric": "auc",
+    'verbose':-1,
+})
+
+best_params_6.update({
     "objective": "binary",
     "metric": "auc",
     'verbose':-1
@@ -367,8 +503,27 @@ best_params_15 =  {
     'verbose': -1
 }
 
+best_params_20 = {'boosting_type': 'gbdt', 'n_estimators': 7730, 'learning_rate': 0.028778047251309946, 'num_leaves': 96, 'max_depth': 3, 'min_child_samples': 13, 'min_child_weight': 0.2316553378161039, 'min_split_gain': 0.042823710761769954, 'subsample': 0.36699422027167905, 'colsample_bytree': 0.12199531962565616, 'reg_alpha': 0.5624471773258042, 'reg_lambda': 2.9747133675697754}
+best_params_20.update({
+    "objective": "binary",
+    "metric": "auc",
+    'verbose':-1
+})
+#Best ROC AUC: 0.9549473966464134
 
-best_model = LGBMClassifier(**best_params_8 )
+best_params_21 = {'n_estimators': 4343, 'booster': 'gbtree', 'learning_rate': 0.010000125683412985, 'max_depth': 6, 'min_child_weight': 3.878154601638403, 'lambda': 0.13356756277564016, 'alpha': 0.9740299770615558, 'subsample': 0.4802304092115578, 'colsample_bytree': 0.13914450450093727, 'rate_drop': 0.11434876974668576, 'skip_drop': 0.38995180090292847}
+best_params_21.update({
+        "objective": "binary:logistic",
+        "tree_method": "hist",  # veya "gpu_hist" (GPU varsa)
+        "eval_metric": "auc",
+        "random_state": 42,
+        "n_jobs": -1,
+        
+})
+
+#best_model = XGBClassifier(**best_params_21)
+
+best_model = LGBMClassifier(**best_params_2 )
 
 
 # x_train_proc = preprocess.fit_transform(X_train)
@@ -406,4 +561,55 @@ scores = cross_val_score(
 )
 print(scores)
 print(scores.mean())
+print(scores.std())
 #0.9556102787583592
+
+# 0.9556192975305083
+# 0.0003032655846381329
+
+#[0.95506607 0.95539862 0.95588614]
+# 0.955450277562687
+# 0.00033677960217462185
+# = 0.95353 
+# fark 0.00192027756
+
+# [0.95517674 0.95552322 0.95598828]
+# 0.9555627427731158
+# 0.0003324864275739915
+#  = 0.95372
+# fark 0.00184274277
+
+# [0.95537674 0.95572322 0.95618828]
+#hedef
+
+#best_20
+# [0.95525091 0.9555689  0.95599298]
+# 0.9556042643531693
+# 0.0003039766270754864  - best 20
+
+# best_2
+# [0.9550316  0.955373   0.95583206]
+# 0.9554122191570485
+# 0.00032796230005817064
+
+# best_2 1994
+# [0.95517053 0.9555071  0.95594732]
+# 0.9555416525883745
+# 0.000318062814546956
+
+# 0.95517099 0.95551709 0.95593818]
+# 0.9555420878012192
+# 0.0003137052782975615
+
+# [0.95517971 0.95550763 0.95593013]
+# 0.955539154774828
+# 0.0003071664529637824
+
+# [0.9551691  0.95554676 0.95595755]
+# 0.9555578020347673
+# 0.00032197772586327794
+
+#best_8
+# [0.9552207  0.95557409 0.95601222]
+# 0.9556023358022884
+# 0.00032375402181360457
