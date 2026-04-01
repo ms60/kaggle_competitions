@@ -8,6 +8,9 @@ from sklearn.model_selection import StratifiedKFold, cross_val_score, train_test
 
 from hill_climbing import Climber
 from hill_climbing import ClimberCV
+from sklearn.preprocessing import OneHotEncoder , StandardScaler
+from sklearn.compose import make_column_transformer
+
 
 train = pd.read_csv("./data/train.csv")
 test = pd.read_csv("./data/test.csv")
@@ -335,6 +338,48 @@ X_3_new_features_params.update({
 #--------------------------------------
 # elastic - ridge - lasso with different parameters
 
+X_linear_raw = train.drop(["id","Churn"],axis=1)
+X_linear_raw_test = test.drop("id",axis=1)
+
+for col in numeric_features:
+    X_linear_raw[col] = np.log1p(X_linear_raw[col])
+    X_linear_raw_test[col] = np.log1p(X_linear_raw_test[col])
+
+
+
+preprocessor = make_column_transformer(
+    (OneHotEncoder(handle_unknown='ignore'),ohe_features),
+    (StandardScaler(),numeric_features),
+    remainder='passthrough'
+
+)
+
+logreg_ridge = LogisticRegression(
+    penalty="l2",        # Ridge
+    C=1.0,               # Regularization gücü (küçük C = daha güçlü)
+    solver="lbfgs",      # default ve stabil
+    max_iter=1000,
+    n_jobs=-1
+)
+
+logreg_lasso = LogisticRegression(
+    penalty="l1",        # Lasso
+    C=1.0,
+    solver="liblinear", # veya "saga"
+    max_iter=1000
+)
+
+logreg_elastic = LogisticRegression(
+    penalty="elasticnet",
+    C=1.0,
+    l1_ratio=0.5,       # 0 → Ridge, 1 → Lasso
+    solver="saga",      # şart
+    max_iter=1000,
+    n_jobs=-1
+)
+
+
+
 #--------------------------------------
 # DL with different parameters
 
@@ -433,6 +478,101 @@ X_3_new_features_params.update({
 # oof_test.to_csv("./stack/X_3_new_features_oof_test.csv",index=False)
 
 
+#---------------------------------
+#run optuna for LINEAR MODELS
+
+# DATASET = X_linear_raw
+
+# X_train , X_valid , y_train , y_valid = train_test_split(DATASET , y , test_size=0.075 , random_state=42 , stratify=y)
+# X_train_2 , X_valid_2 , y_train_2 , y_valid_2 = train_test_split(DATASET , y , test_size=0.075 , random_state=60 , stratify=y)
+
+# X_train_proc = preprocessor.fit_transform(X_train)
+# X_valid_proc = preprocessor.transform(X_valid)
+
+# X_train_2_proc = preprocessor.fit_transform(X_train_2)
+# X_valid_2_proc = preprocessor.transform(X_valid_2)
+
+
+
+
+# def objective(trial):
+#     params= {
+#     "solver":trial.suggest_categorical("solver", ["saga"]),
+#     "penalty":trial.suggest_categorical("penalty", ["elasticnet"]),
+#     "l1_ratio":trial.suggest_float("l1_ratio", 0.5,0.5),
+
+#     "C": trial.suggest_int("C", 1, 100),
+#     "max_iter": trial.suggest_int("max_iter", 100, 5000),
+
+#     "objective": "binary",
+#     "metric": "auc",
+#     "random_state": 42,
+#     "verbosity": -1,
+#     }
+
+
+
+#     model = LogisticRegression(**params)
+#     model.fit(X_train_proc,y_train)
+
+#     #y_preds = model.predict(X_valid_proc)
+#     y_proba = model.predict_proba(X_valid_proc)[:, 1]
+
+#     score = roc_auc_score(y_valid, y_proba)
+
+#     model2 = LogisticRegression(**params)
+#     model2.fit(X_train_2_proc,y_train_2)
+#     y_proba2 = model2.predict_proba(X_valid_2_proc)[:, 1]
+#     score2 = roc_auc_score(y_valid_2, y_proba2)
+
+    
+#     return  (score + score2) / 2 
+
+# study = optuna.create_study(direction='maximize')
+# study.optimize(objective, n_trials=60)
+
+# print("Best ROC AUC:", study.best_value)
+# print("Best params:", study.best_params)
+
+# best_params = study.best_params
+
+#---------------------
+# generate oofs FOR LINEAR MODELS
+
+# oof_preds = np.zeros(len(X_1), dtype=float) 
+# test_preds = np.zeros(len(X_1_test), dtype=float)
+
+
+
+# skf = StratifiedKFold(n_splits=10, shuffle=True, random_state=42)
+
+# for fold, (train_idx, valid_idx) in enumerate(skf.split(X_linear_raw, y)):
+
+#     print(f"Fold {fold+1}")
+
+#     X_train, X_valid = X_linear_raw.iloc[train_idx], X_linear_raw.iloc[valid_idx]
+#     y_train, y_valid = y.iloc[train_idx], y.iloc[valid_idx]
+
+#     X_train_proc = preprocessor.fit_transform(X_train)
+#     X_valid_proc = preprocessor.transform(X_valid)
+#     X_linear_raw_test_proc = preprocessor.transform(X_linear_raw_test)
+
+
+
+#     model = logreg_ridge
+#     model.fit(X_train_proc,y_train)
+
+#     oof_preds[valid_idx] = model.predict_proba(X_valid_proc)[:,1]
+#     test_preds += model.predict_proba(X_linear_raw_test_proc)[:,1] / skf.n_splits
+
+
+# oof_X = pd.DataFrame({"oof_pred": oof_preds})
+# oof_test = pd.DataFrame({"oof_pred_test": test_preds})
+
+# oof_X.to_csv("./stack/X_linear_raw_ridge_oof.csv",index=False)
+# oof_test.to_csv("./stack/X_linear_raw_ridge_oof_test.csv",index=False)
+
+
 #--------------------------------------
 # stacking
 
@@ -446,6 +586,36 @@ X_categorical_3_oof = pd.read_csv("./stack/X_categorical_3_oof.csv")
 X_2_oof = pd.read_csv("./stack/X2_oof.csv")
 X_3_oof = pd.read_csv("./stack/X3_oof.csv")
 X_3_new_features_oof = pd.read_csv("./stack/X_3_new_features_oof.csv")
+X_linear_raw_ridge_oof = pd.read_csv("./stack/X_linear_raw_ridge_oof.csv")
+X_linear_raw_lasso_oof = pd.read_csv("./stack/X_linear_raw_lasso_oof.csv")
+X_linear_raw_elastic_oof = pd.read_csv("./stack/X_linear_raw_elastic_oof.csv")
+X_4_oof = pd.read_csv("./stack/X_4_oof.csv")
+X_5_oof = pd.read_csv("./stack/X_5_oof.csv")
+X_6_oof = pd.read_csv("./stack/X_6_oof.csv")
+X_raw_xgb_oof = pd.read_csv("./stack/X_raw_xgb_oof.csv")
+X_7_oof = pd.read_csv("./stack/X_7_oof.csv")
+X_8_oof = pd.read_csv("./stack/X_8_oof.csv")
+X_9_oof = pd.read_csv("./stack/X_9_oof.csv")
+X_10_oof = pd.read_csv("./stack/X_10_oof.csv")
+X_11_oof = pd.read_csv("./stack/X_11_oof.csv")
+X_12_oof = pd.read_csv("./stack/X_12_oof.csv")
+X_13_oof = pd.read_csv("./stack/X_13_oof.csv")
+X_14_oof = pd.read_csv("./stack/X_14_oof.csv")
+X_15_oof = pd.read_csv("./stack/X_15_oof.csv")
+X_16_oof = pd.read_csv("./stack/X_16_oof.csv").iloc[:len(X_15_oof)]
+X_17_oof = pd.read_csv("./stack/X_17_oof.csv").iloc[:len(X_15_oof)]
+X_18_oof = pd.read_csv("./stack/X_18_oof.csv").iloc[:len(X_15_oof)]
+X_19_oof = pd.read_csv("./stack/X_19_oof.csv").iloc[:len(X_15_oof)]
+X_20_oof = pd.read_csv("./stack/X_20_oof.csv")
+
+
+
+
+
+
+
+
+
 
 
 X_raw_oof_test = pd.read_csv("./stack/X_raw_oof_test.csv")
@@ -458,16 +628,59 @@ X_categorical_3_oof_test = pd.read_csv("./stack/X_categorical_3_oof_test.csv")
 X_2_oof_test = pd.read_csv("./stack/X2_oof_test.csv")
 X_3_oof_test = pd.read_csv("./stack/X3_oof_test.csv")
 X_3_new_features_oof_test = pd.read_csv("./stack/X_3_new_features_oof_test.csv")
+X_linear_raw_ridge_oof_test = pd.read_csv("./stack/X_linear_raw_ridge_oof_test.csv")
+X_linear_raw_lasso_oof_test = pd.read_csv("./stack/X_linear_raw_lasso_oof_test.csv")
+X_linear_raw_elastic_oof_test = pd.read_csv("./stack/X_linear_raw_elastic_oof_test.csv")
+X_4_oof_test = pd.read_csv("./stack/X_4_oof_test.csv")
+X_5_oof_test = pd.read_csv("./stack/X_5_oof_test.csv")
+X_6_oof_test = pd.read_csv("./stack/X_6_oof_test.csv")
+X_raw_xgb_oof_test = pd.read_csv("./stack/X_raw_xgb_oof_test.csv")
+X_7_oof_test = pd.read_csv("./stack/X_7_oof_test.csv")
+X_8_oof_test = pd.read_csv("./stack/X_8_oof_test.csv")
+X_9_oof_test = pd.read_csv("./stack/X_9_oof_test.csv")
+X_10_oof_test = pd.read_csv("./stack/X_10_oof_test.csv")
+X_11_oof_test = pd.read_csv("./stack/X_11_oof_test.csv")
+X_12_oof_test = pd.read_csv("./stack/X_12_oof_test.csv")
+X_13_oof_test = pd.read_csv("./stack/X_13_oof_test.csv")
+X_14_oof_test = pd.read_csv("./stack/X_14_oof_test.csv")
+X_15_oof_test = pd.read_csv("./stack/X_15_oof_test.csv")
+X_16_oof_test = pd.read_csv("./stack/X_16_oof_test.csv")
+X_17_oof_test = pd.read_csv("./stack/X_17_oof_test.csv")
+X_18_oof_test = pd.read_csv("./stack/X_18_oof_test.csv")
+X_19_oof_test = pd.read_csv("./stack/X_19_oof_test.csv")
+X_20_oof_test = pd.read_csv("./stack/X_20_oof_test.csv")
 
 
 
 
 
-X_oof_total = pd.concat([X_raw_oof,X_numeric_oof,X_1_oof,X_1_new_features_oof,X_categorical_1_oof,X_categorical_2_oof,X_categorical_3_oof,X_2_oof,X_3_oof,X_3_new_features_oof],axis=1)
-X_oof_total.columns = ["X_raw_oof","X_numeric_oof","X_1_oof","X_1_new_features_oof","X_categorical_1_oof","X_categorical_2_oof","X_categorical_3_oof","X_2_oof" , "X_3_oof","X_3_new_features_oof"]
 
-X_oof_test_total = pd.concat([X_raw_oof_test,X_numeric_oof_test,X_1_oof_test,X_1_new_features_oof_test,X_categorical_1_oof_test,X_categorical_2_oof_test,X_categorical_3_oof_test,X_2_oof_test,X_3_oof_test,X_3_new_features_oof_test],axis=1)
-X_oof_test_total.columns = ["X_raw_oof","X_numeric_oof","X_1_oof","X_1_new_features_oof","X_categorical_1_oof","X_categorical_2_oof","X_categorical_3_oof","X_2_oof" , "X_3_oof","X_3_new_features_oof"]#["X_raw_oof_test","X_numeric_oof_test","X_1_oof_test","X_1_new_features_oof_test","X_categorical_1_oof_test","X_categorical_2_oof_test","X_categorical_3_oof_test"]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+X_oof_total =  pd.concat([X_19_oof,X_20_oof],axis=1) #pd.concat([X_raw_oof,X_numeric_oof,X_1_oof,X_1_new_features_oof,X_categorical_1_oof,X_categorical_2_oof,X_categorical_3_oof,X_2_oof,X_3_oof,X_3_new_features_oof,X_linear_raw_ridge_oof,X_linear_raw_lasso_oof,X_linear_raw_elastic_oof , X_4_oof , X_5_oof , X_6_oof , X_raw_xgb_oof , X_7_oof , X_8_oof , X_9_oof , X_10_oof , X_11_oof,X_12_oof , X_13_oof,X_14_oof,X_15_oof,X_16_oof,X_17_oof , X_18_oof , X_19_oof],axis=1)
+X_oof_total.columns =  ["X_19_oof","X_20_oof"] #["X_raw_oof","X_numeric_oof","X_1_oof","X_1_new_features_oof","X_categorical_1_oof","X_categorical_2_oof","X_categorical_3_oof","X_2_oof" , "X_3_oof","X_3_new_features_oof","X_linear_raw_ridge_oof","X_linear_raw_lasso_oof","X_linear_raw_elastic_oof" , "X_4_oof" , "X_5_oof" , "X_6_oof" , "X_raw_xgb_oof","X_7_oof" , "X_8_oof" , "X_9_oof" , "X_10_oof" , "X_11_oof","X_12_oof" , "X_13_oof","X_14_oof","X_15_oof","X_16_oof","X_17_oof" , "X_18_oof" , "X_19_oof"]
+
+X_oof_test_total =  pd.concat([X_19_oof_test,X_20_oof_test],axis=1) #pd.concat([X_raw_oof_test,X_numeric_oof_test,X_1_oof_test,X_1_new_features_oof_test,X_categorical_1_oof_test,X_categorical_2_oof_test,X_categorical_3_oof_test,X_2_oof_test,X_3_oof_test,X_3_new_features_oof_test,X_linear_raw_ridge_oof_test,X_linear_raw_lasso_oof_test,X_linear_raw_elastic_oof_test , X_4_oof_test , X_5_oof_test , X_6_oof_test , X_raw_xgb_oof_test,X_7_oof_test , X_8_oof_test , X_9_oof_test , X_10_oof_test , X_11_oof_test,X_12_oof_test , X_13_oof_test,X_14_oof_test,X_15_oof_test,X_16_oof_test,X_17_oof_test , X_18_oof_test , X_19_oof_test],axis=1)
+X_oof_test_total.columns =  ["X_19_oof","X_20_oof"] #["X_raw_oof","X_numeric_oof","X_1_oof","X_1_new_features_oof","X_categorical_1_oof","X_categorical_2_oof","X_categorical_3_oof","X_2_oof" , "X_3_oof","X_3_new_features_oof","X_linear_raw_ridge_oof","X_linear_raw_lasso_oof","X_linear_raw_elastic_oof","X_4_oof","X_5_oof" , "X_6_oof" , "X_raw_xgb_oof","X_7_oof", "X_8_oof" , "X_9_oof", "X_10_oof" , "X_11_oof","X_12_oof", "X_13_oof","X_14_oof","X_15_oof","X_16_oof","X_17_oof" , "X_18_oof" , "X_19_oof"]#["X_raw_oof_test","X_numeric_oof_test","X_1_oof_test","X_1_new_features_oof_test","X_categorical_1_oof_test","X_categorical_2_oof_test","X_categorical_3_oof_test"]
 
 
 
@@ -487,14 +700,14 @@ print(X_oof_total.corr())
 # )
 
 
-X_train , X_valid , y_train , y_valid = train_test_split(X_oof_total , y , test_size=0.075 , random_state=42 , stratify=y)
-X_train_2 , X_valid_2 , y_train_2 , y_valid_2 = train_test_split(X_oof_total , y , test_size=0.075 , random_state=60 , stratify=y)
-
 
 
 climber_cv = ClimberCV(
     objective="maximize",
     eval_metric=roc_auc_score,
+    #precision=0.005,
+    score_decimal_places= 7 ,
+    use_gpu = True,
     cv=StratifiedKFold(n_splits=5, random_state=42, shuffle=True)
 )
 
@@ -503,3 +716,8 @@ final_test = climber_cv.predict(X_oof_test_total)
 
 result = pd.DataFrame({ "id": test["id"], "Churn": final_test })
 result.to_csv("result.csv",index=False)
+
+#0.917639 -> 0.91505
+#0.918198 -> 0.91570
+#0.918270 -> 0.91577
+#0.918306 -> 0.91580
